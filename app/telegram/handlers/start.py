@@ -17,7 +17,8 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             parse_mode="MarkdownV2",
             reply_markup=reply_keyboard,
         )
+        inline_keyboard = get_main_menu_keyboard()
         await update.message.reply_text(
             text="Виберіть розділ:",
-            reply_markup=get_main_menu_keyboard(),
+            reply_markup=inline_keyboard,  # type: ignore[arg-type]
         )

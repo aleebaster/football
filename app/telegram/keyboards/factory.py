@@ -17,8 +17,7 @@ def create_inline_keyboard(
     keyboard: list[list[InlineKeyboardButton]] = []
     for row in rows:
         buttons = [
-            InlineKeyboardButton(text=text, callback_data=data)
-            for text, data in row
+            InlineKeyboardButton(text=text, callback_data=data) for text, data in row
         ]
         keyboard.append(buttons)
     return InlineKeyboardMarkup(keyboard)

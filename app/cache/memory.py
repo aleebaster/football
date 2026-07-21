@@ -14,7 +14,9 @@ logger = get_logger(__name__)
 class MemoryCache(CacheBackend):
     """In-memory cache with TTL support."""
 
-    def __init__(self, max_size: int | None = None, default_ttl: int | None = None) -> None:
+    def __init__(
+        self, max_size: int | None = None, default_ttl: int | None = None
+    ) -> None:
         """Initialize memory cache."""
         self._cache: dict[str, tuple[Any, float]] = {}
         self._max_size: int = max_size or settings.cache.max_size
@@ -67,7 +69,8 @@ class MemoryCache(CacheBackend):
         """Get all keys matching pattern."""
         current_time = time.time()
         valid_keys = [
-            key for key, (_, expire_time) in self._cache.items()
+            key
+            for key, (_, expire_time) in self._cache.items()
             if current_time <= expire_time
         ]
 

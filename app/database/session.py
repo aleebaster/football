@@ -35,7 +35,7 @@ class DatabaseSessionManager:
             engine_kwargs["pool_size"] = settings.database.pool_size
             engine_kwargs["max_overflow"] = settings.database.max_overflow
 
-        self._engine = create_async_engine(self._url, **engine_kwargs)  # type: ignore[arg-type]
+        self._engine = create_async_engine(self._url, **engine_kwargs)
         self._session_factory = async_sessionmaker(
             bind=self._engine,
             class_=AsyncSession,

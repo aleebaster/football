@@ -14,7 +14,7 @@ class TelegramBot:
 
     def __init__(self) -> None:
         """Initialize the Telegram bot."""
-        self._application: Application | None = None
+        self._application: Application | None = None  # type: ignore[type-arg]  # type: ignore[type-arg]
         self._initialized: bool = False
 
     async def initialize(self) -> None:
@@ -22,7 +22,9 @@ class TelegramBot:
         if self._initialized:
             return
 
-        self._application = ApplicationBuilder().token(settings.telegram.bot_token).build()
+        self._application = (
+            ApplicationBuilder().token(settings.telegram.bot_token).build()
+        )
         setup_dispatcher(self._application)
         self._initialized = True
         logger.info("Telegram bot platform initialized")
@@ -49,6 +51,6 @@ class TelegramBot:
             logger.info("Telegram bot stopped")
 
     @property
-    def application(self) -> Application | None:
+    def application(self) -> Application | None:  # type: ignore[type-arg]  # type: ignore[type-arg]
         """Get the application instance."""
         return self._application

@@ -95,7 +95,7 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         )
     except Exception as e:
         logger.error(f"Failed to edit message for user {user_id}: {e}")
-        msg: Message | None = query.message
+        msg = query.message
         if isinstance(msg, Message):
             try:
                 await msg.reply_text(
