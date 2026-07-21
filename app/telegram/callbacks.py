@@ -5,6 +5,7 @@ from enum import StrEnum
 
 class MenuCallback(StrEnum):
     """Main menu callbacks."""
+
     MAIN_MENU = "menu:main"
     BACK = "menu:back"
     HOME = "menu:home"
@@ -12,6 +13,7 @@ class MenuCallback(StrEnum):
 
 class SignalsCallback(StrEnum):
     """Signals menu callbacks."""
+
     ACTIVE = "signals:active"
     HISTORY = "signals:history"
     FAVORITES = "signals:favorites"
@@ -20,6 +22,7 @@ class SignalsCallback(StrEnum):
 
 class MonitoringCallback(StrEnum):
     """Monitoring menu callbacks."""
+
     ADD = "monitoring:add"
     REMOVE = "monitoring:remove"
     LIST = "monitoring:list"
@@ -28,6 +31,7 @@ class MonitoringCallback(StrEnum):
 
 class MarketCallback(StrEnum):
     """Market menu callbacks."""
+
     LIVE_ODDS = "market:odds"
     MOVERS = "market:movers"
     TRENDING = "market:trending"
@@ -36,6 +40,7 @@ class MarketCallback(StrEnum):
 
 class TopCallback(StrEnum):
     """Top opportunities callbacks."""
+
     EV = "top:ev"
     TOURNAMENTS = "top:tournaments"
     TEAMS = "top:teams"
@@ -43,6 +48,7 @@ class TopCallback(StrEnum):
 
 class AICallback(StrEnum):
     """AI analysis callbacks."""
+
     ANALYSIS = "ai:analysis"
     PREDICTIONS = "ai:predictions"
     PATTERNS = "ai:patterns"
@@ -50,6 +56,7 @@ class AICallback(StrEnum):
 
 class StatsCallback(StrEnum):
     """Statistics callbacks."""
+
     OVERVIEW = "stats:overview"
     DETAILED = "stats:detailed"
     EXPORT = "stats:export"
@@ -57,6 +64,7 @@ class StatsCallback(StrEnum):
 
 class SettingsCallback(StrEnum):
     """Settings callbacks."""
+
     LANGUAGE = "settings:language"
     NOTIFICATIONS = "settings:notifications"
     FREQUENCY = "settings:frequency"
@@ -65,6 +73,7 @@ class SettingsCallback(StrEnum):
 
 class HelpCallback(StrEnum):
     """Help callbacks."""
+
     GUIDE = "help:guide"
     FAQ = "help:faq"
     CONTACT = "help:contact"

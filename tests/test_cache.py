@@ -64,15 +64,18 @@ class TestMemoryCache:
 
     @pytest.mark.asyncio
     async def test_ttl_expiration(self) -> None:
-        """Test that entries expire after TTL."""
+        """Test that entries expire after TTL using public API."""
         cache = MemoryCache(max_size=10, default_ttl=60)
+        # Set with TTL=1 second
         await cache.set("key1", "value1", ttl=1)
-        # Value should exist immediately
+        # Should exist immediately
         assert await cache.get("key1") == "value1"
-        # Manually expire by manipulating internal cache
-        cache._cache["key1"] = ("value1", time.time() - 1)
-        result = await cache.get("key1")
-        assert result is None
+        assert await cache.exists("key1") is True
+        # Wait for expiration
+        time.sleep(1.1)
+        # Should be expired
+        assert await cache.get("key1") is None
+        assert await cache.exists("key1") is False
 
 
 class TestCacheManager:

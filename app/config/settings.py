@@ -25,8 +25,7 @@ class DatabaseSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="DATABASE_")
 
     url: str = Field(
-        default="sqlite+aiosqlite:///football.db",
-        description="Database connection URL"
+        default="sqlite+aiosqlite:///football.db", description="Database connection URL"
     )
     echo: bool = Field(default=False, description="Enable SQL echo logging")
     pool_size: int = Field(default=5, description="Connection pool size")
@@ -41,11 +40,10 @@ class LogSettings(BaseSettings):
     level: str = Field(default="INFO", description="Log level")
     format: str = Field(
         default="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{function}:{line} - {message}",
-        description="Log format"
+        description="Log format",
     )
     rotation: str = Field(default="100 MB", description="Log rotation size")
-    retention: str = Field(default="30 days", description="Log retention period"
-    )
+    retention: str = Field(default="30 days", description="Log retention period")
     compression: str = Field(default="gz", description="Log compression format")
 
 
@@ -56,7 +54,9 @@ class CacheSettings(BaseSettings):
 
     backend: str = Field(default="memory", description="Cache backend (memory/redis)")
     ttl: int = Field(default=300, description="Cache TTL in seconds")
-    max_size: int = Field(default=1000, description="Max cache entries for memory backend")
+    max_size: int = Field(
+        default=1000, description="Max cache entries for memory backend"
+    )
     redis_url: str | None = Field(default=None, description="Redis connection URL")
 
 
@@ -84,7 +84,9 @@ class AnalysisSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="ANALYSIS_")
 
     update_interval: int = Field(default=300, description="Update interval in seconds")
-    min_expected_value: float = Field(default=5.0, description="Minimum expected value threshold")
+    min_expected_value: float = Field(
+        default=5.0, description="Minimum expected value threshold"
+    )
     min_profit: float = Field(default=3.0, description="Minimum profit threshold")
 
 
@@ -103,8 +105,12 @@ class Settings(BaseSettings):
     debug: bool = Field(default=False, description="Enable debug mode")
 
     # Paths
-    base_dir: Path = Field(default_factory=lambda: Path(__file__).resolve().parent.parent.parent)
-    logs_dir: Path = Field(default_factory=lambda: Path(__file__).resolve().parent.parent.parent / "logs")
+    base_dir: Path = Field(
+        default_factory=lambda: Path(__file__).resolve().parent.parent.parent
+    )
+    logs_dir: Path = Field(
+        default_factory=lambda: Path(__file__).resolve().parent.parent.parent / "logs"
+    )
 
     # Sub-configurations
     telegram: TelegramSettings = Field(default_factory=TelegramSettings)

@@ -107,5 +107,13 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             parse_mode="MarkdownV2",
             reply_markup=keyboard(),
         )
-    except Exception:
-        pass
+    except Exception as e:
+        from app.logging import get_logger
+
+        logger = get_logger(__name__)
+        logger.error(f"Failed to edit message for user {user_id}: {e}")
+        await query.message.reply_text(
+            text=text,
+            parse_mode="MarkdownV2",
+            reply_markup=keyboard(),
+        )

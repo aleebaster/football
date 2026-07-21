@@ -5,7 +5,6 @@ Provides CLI commands for database operations.
 
 import asyncio
 import sys
-from pathlib import Path
 
 
 async def init_db() -> None:

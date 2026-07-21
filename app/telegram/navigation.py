@@ -12,11 +12,15 @@ class NavigationManager:
         self._stacks: dict[int, list[str]] = {}
         self._handlers: dict[str, Callable[..., Awaitable[Any]]] = {}
 
-    def register_handler(self, callback_data: str, handler: Callable[..., Awaitable[Any]]) -> None:
+    def register_handler(
+        self, callback_data: str, handler: Callable[..., Awaitable[Any]]
+    ) -> None:
         """Register a handler for callback data."""
         self._handlers[callback_data] = handler
 
-    async def navigate(self, user_id: int, callback_data: str) -> tuple[str, Callable[..., Awaitable[Any]] | None]:
+    async def navigate(
+        self, user_id: int, callback_data: str
+    ) -> tuple[str, Callable[..., Awaitable[Any]] | None]:
         """Navigate to a callback and return the handler."""
         if user_id not in self._stacks:
             self._stacks[user_id] = []
@@ -27,7 +31,9 @@ class NavigationManager:
         handler = self._handlers.get(callback_data)
         return callback_data, handler
 
-    async def go_back(self, user_id: int) -> tuple[str, Callable[..., Awaitable[Any]] | None]:
+    async def go_back(
+        self, user_id: int
+    ) -> tuple[str, Callable[..., Awaitable[Any]] | None]:
         """Go back in navigation stack."""
         if user_id not in self._stacks or not self._stacks[user_id]:
             return "menu:main", self._handlers.get("menu:main")
@@ -40,7 +46,9 @@ class NavigationManager:
         last = self._stacks[user_id][-1]
         return last, self._handlers.get(last)
 
-    async def go_home(self, user_id: int) -> tuple[str, Callable[..., Awaitable[Any]] | None]:
+    async def go_home(
+        self, user_id: int
+    ) -> tuple[str, Callable[..., Awaitable[Any]] | None]:
         """Go to home menu."""
         self._stacks[user_id] = []
         return "menu:main", self._handlers.get("menu:main")

@@ -39,13 +39,15 @@ class DatabaseSessionManager:
         if "sqlite" in self._url:
             connect_args["check_same_thread"] = False
 
-        self._engine = create_async_engine(
-            self._url,
-            echo=settings.database.echo,
-            pool_size=settings.database.pool_size if "sqlite" not in self._url else None,
-            max_overflow=settings.database.max_overflow if "sqlite" not in self._url else None,
-            connect_args=connect_args,
-        )
+        engine_kwargs = {
+            "echo": settings.database.echo,
+            "connect_args": connect_args,
+        }
+        if "sqlite" not in self._url:
+            engine_kwargs["pool_size"] = settings.database.pool_size
+            engine_kwargs["max_overflow"] = settings.database.max_overflow
+
+        self._engine = create_async_engine(self._url, **engine_kwargs)
         self._session_factory = async_sessionmaker(
             bind=self._engine,
             class_=AsyncSession,

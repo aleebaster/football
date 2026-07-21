@@ -17,6 +17,8 @@ def create_inline_keyboard(rows: list[list[tuple[str, str]]]) -> InlineKeyboardM
     """
     keyboard = []
     for row in rows:
-        buttons = [InlineKeyboardButton(text=text, callback_data=data) for text, data in row]
+        buttons = [
+            InlineKeyboardButton(text=text, callback_data=data) for text, data in row
+        ]
         keyboard.append(buttons)
     return InlineKeyboardMarkup(keyboard)

@@ -11,10 +11,14 @@ class TestSettings:
         """Test settings load with default values."""
         from app.config.settings import Settings
 
-        with patch.dict(os.environ, {
-            "TELEGRAM_BOT_TOKEN": "test-token",
-            "TELEGRAM_ADMIN_ID": "12345",
-        }, clear=False):
+        with patch.dict(
+            os.environ,
+            {
+                "TELEGRAM_BOT_TOKEN": "test-token",
+                "TELEGRAM_ADMIN_ID": "12345",
+            },
+            clear=False,
+        ):
             settings = Settings()
             assert settings.language == "uk"
             assert settings.project_name == "Football Analysis"
@@ -23,10 +27,13 @@ class TestSettings:
         """Test Telegram settings initialization."""
         from app.config.settings import TelegramSettings
 
-        with patch.dict(os.environ, {
-            "TELEGRAM_BOT_TOKEN": "test-token",
-            "TELEGRAM_ADMIN_ID": "12345",
-        }):
+        with patch.dict(
+            os.environ,
+            {
+                "TELEGRAM_BOT_TOKEN": "test-token",
+                "TELEGRAM_ADMIN_ID": "12345",
+            },
+        ):
             settings = TelegramSettings()
             assert settings.bot_token == "test-token"
             assert settings.admin_id == 12345

@@ -24,7 +24,9 @@ class MemoryCache(CacheBackend):
         - Thread-safe operations
     """
 
-    def __init__(self, max_size: int | None = None, default_ttl: int | None = None) -> None:
+    def __init__(
+        self, max_size: int | None = None, default_ttl: int | None = None
+    ) -> None:
         """Initialize memory cache.
 
         Args:
@@ -126,7 +128,8 @@ class MemoryCache(CacheBackend):
         async with self._lock:
             current_time = time.time()
             valid_keys = [
-                key for key, (_, expire_time) in self._cache.items()
+                key
+                for key, (_, expire_time) in self._cache.items()
                 if current_time <= expire_time
             ]
 
@@ -135,6 +138,7 @@ class MemoryCache(CacheBackend):
                 return valid_keys
 
             import fnmatch
+
             return [key for key in valid_keys if fnmatch.fnmatch(key, pattern)]
 
     async def size(self) -> int:

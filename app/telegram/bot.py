@@ -29,9 +29,7 @@ class TelegramBot:
             return
 
         self._application = (
-            ApplicationBuilder()
-            .token(settings.telegram.bot_token)
-            .build()
+            ApplicationBuilder().token(settings.telegram.bot_token).build()
         )
 
         # Setup all handlers
