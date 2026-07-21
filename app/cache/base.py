@@ -113,7 +113,11 @@ class CacheManager:
             return value
 
         if callable(factory):
-            value = await factory() if callable(factory) else factory
+            import inspect
+            if inspect.iscoroutinefunction(factory):
+                value = await factory()
+            else:
+                value = factory()
         else:
             value = factory
 

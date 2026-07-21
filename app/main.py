@@ -81,9 +81,9 @@ def _register_routers(app: FastAPI) -> None:
     Args:
         app: FastAPI application instance.
     """
-    from app.dashboard import router as dashboard_router
+    from app.dashboard import router
 
-    app.include_router(dashboard_router.router)
+    app.include_router(router)
 
 
 # Create application instance

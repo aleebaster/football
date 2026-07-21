@@ -1,4 +1,5 @@
-"""Database models package.
+"""Database models package."""
 
-Contains all SQLAlchemy ORM models.
-"""
+from app.database.models.user import User
+
+__all__ = ["User"]

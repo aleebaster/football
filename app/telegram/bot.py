@@ -1,15 +1,10 @@
-"""Telegram bot class.
+"""Telegram bot class with platform architecture."""
 
-Provides the main Telegram bot instance and configuration.
-"""
-
-from typing import Any
-
-from telegram import Bot
-from telegram.ext import Application
+from telegram.ext import Application, ApplicationBuilder
 
 from app.config import settings
 from app.logging import get_logger
+from app.telegram.dispatcher import setup_dispatcher
 
 logger = get_logger(__name__)
 
@@ -25,7 +20,6 @@ class TelegramBot:
 
     def __init__(self) -> None:
         """Initialize the Telegram bot."""
-        self._bot: Bot | None = None
         self._application: Application | None = None
         self._initialized = False
 
@@ -35,13 +29,16 @@ class TelegramBot:
             return
 
         self._application = (
-            Application.builder()
+            ApplicationBuilder()
             .token(settings.telegram.bot_token)
             .build()
         )
-        self._bot = self._application.bot
+
+        # Setup all handlers
+        setup_dispatcher(self._application)
+
         self._initialized = True
-        logger.info("Telegram bot initialized")
+        logger.info("Telegram bot platform initialized")
 
     async def start(self) -> None:
         """Start the bot polling."""
@@ -63,29 +60,6 @@ class TelegramBot:
             logger.info("Telegram bot stopped")
 
     @property
-    def bot(self) -> Bot | None:
-        """Get the bot instance."""
-        return self._bot
-
-    @property
     def application(self) -> Application | None:
         """Get the application instance."""
         return self._application
-
-    def add_handler(self, handler: Any) -> None:
-        """Add a handler to the application.
-
-        Args:
-            handler: Telegram handler to add.
-        """
-        if self._application:
-            self._application.add_handler(handler)
-
-    def add_handlers(self, handlers: dict[int, Any]) -> None:
-        """Add multiple handlers to the application.
-
-        Args:
-            handlers: Dictionary of handler groups and handlers.
-        """
-        if self._application:
-            self._application.add_handlers(handlers)

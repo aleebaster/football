@@ -1,4 +1,5 @@
-"""Dashboard module for FastAPI web interface.
+"""Dashboard module for FastAPI web interface."""
 
-Provides FastAPI application and API endpoints.
-"""
+from app.dashboard.router import router
+
+__all__ = ["router"]

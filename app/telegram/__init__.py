@@ -1,7 +1,4 @@
-"""Telegram bot module.
-
-Provides Telegram bot functionality with handlers, keyboards, and middlewares.
-"""
+"""Telegram bot platform module."""
 
 from app.telegram.bot import TelegramBot
 

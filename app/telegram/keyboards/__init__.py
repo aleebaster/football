@@ -1,4 +1,15 @@
-"""Telegram keyboards package.
+"""Telegram keyboards package."""
 
-Provides inline and reply keyboards for the bot.
-"""
+from app.telegram.keyboards.factory import (
+    back_button,
+    create_inline_keyboard,
+    create_reply_keyboard,
+    home_button,
+)
+
+__all__ = [
+    "create_inline_keyboard",
+    "create_reply_keyboard",
+    "back_button",
+    "home_button",
+]

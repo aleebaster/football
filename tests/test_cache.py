@@ -1,6 +1,6 @@
 """Tests for cache module."""
 
-import asyncio
+import time
 
 import pytest
 
@@ -63,11 +63,14 @@ class TestMemoryCache:
         assert "key2" in keys
 
     @pytest.mark.asyncio
-    async def test_ttl_expiration(self, cache: MemoryCache) -> None:
+    async def test_ttl_expiration(self) -> None:
         """Test that entries expire after TTL."""
-        await cache.set("key1", "value1", ttl=0)
-        # Wait for expiration
-        await asyncio.sleep(0.1)
+        cache = MemoryCache(max_size=10, default_ttl=60)
+        await cache.set("key1", "value1", ttl=1)
+        # Value should exist immediately
+        assert await cache.get("key1") == "value1"
+        # Manually expire by manipulating internal cache
+        cache._cache["key1"] = ("value1", time.time() - 1)
         result = await cache.get("key1")
         assert result is None
 

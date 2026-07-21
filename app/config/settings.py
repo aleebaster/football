@@ -15,8 +15,8 @@ class TelegramSettings(BaseSettings):
 
     model_config = SettingsConfigDict(env_prefix="TELEGRAM_")
 
-    bot_token: str = Field(..., description="Telegram Bot API token")
-    admin_id: int = Field(..., description="Telegram admin user ID")
+    bot_token: str = Field(default="", description="Telegram Bot API token")
+    admin_id: int = Field(default=0, description="Telegram admin user ID")
 
 
 class DatabaseSettings(BaseSettings):
@@ -127,3 +127,7 @@ def get_settings() -> Settings:
         Settings: Application settings loaded from environment variables.
     """
     return Settings()
+
+
+# Global settings instance
+settings = Settings()
