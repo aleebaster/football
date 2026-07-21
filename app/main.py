@@ -1,8 +1,4 @@
-"""Main application entry point.
-
-Provides the FastAPI application with lifecycle management,
-router registration, and startup/shutdown hooks.
-"""
+"""Main application entry point."""
 
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
@@ -21,23 +17,16 @@ logger = get_logger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    """Application lifespan manager.
-
-    Handles startup and shutdown events.
-    """
-    # Startup
+    """Application lifespan manager."""
     setup_logging()
     logger.info("Starting application...")
 
-    # Initialize database
     await db_manager.connect()
     logger.info("Database connected")
 
-    # Initialize cache
     get_cache_manager()
     logger.info("Cache initialized")
 
-    # Create database tables
     await db_manager.create_tables()
     logger.info("Database tables created")
 
@@ -45,22 +34,14 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     yield
 
-    # Shutdown
     logger.info("Shutting down application...")
-
-    # Disconnect database
     await db_manager.disconnect()
     logger.info("Database disconnected")
-
     logger.info("Application shut down successfully")
 
 
 def create_app() -> FastAPI:
-    """Create and configure the FastAPI application.
-
-    Returns:
-        Configured FastAPI application.
-    """
+    """Create and configure the FastAPI application."""
     application = FastAPI(
         title=settings.project_name,
         description="Football match analysis and prediction platform",
@@ -69,24 +50,13 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
-    # Register routers
-    _register_routers(application)
+    from app.dashboard import router
+
+    application.include_router(router)
 
     return application
 
 
-def _register_routers(app: FastAPI) -> None:
-    """Register all API routers.
-
-    Args:
-        app: FastAPI application instance.
-    """
-    from app.dashboard import router
-
-    app.include_router(router)
-
-
-# Create application instance
 app = create_app()
 
 

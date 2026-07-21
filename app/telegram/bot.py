@@ -10,31 +10,20 @@ logger = get_logger(__name__)
 
 
 class TelegramBot:
-    """Main Telegram bot class.
-
-    Provides:
-        - Bot instance management
-        - Application setup
-        - Handler registration
-    """
+    """Main Telegram bot class."""
 
     def __init__(self) -> None:
         """Initialize the Telegram bot."""
         self._application: Application | None = None
-        self._initialized = False
+        self._initialized: bool = False
 
     async def initialize(self) -> None:
         """Initialize the bot and application."""
         if self._initialized:
             return
 
-        self._application = (
-            ApplicationBuilder().token(settings.telegram.bot_token).build()
-        )
-
-        # Setup all handlers
+        self._application = ApplicationBuilder().token(settings.telegram.bot_token).build()
         setup_dispatcher(self._application)
-
         self._initialized = True
         logger.info("Telegram bot platform initialized")
 
@@ -43,16 +32,18 @@ class TelegramBot:
         if not self._initialized:
             await self.initialize()
 
-        if self._application:
+        if self._application is not None:
             await self._application.initialize()
             await self._application.start()
-            await self._application.updater.start_polling()
+            if self._application.updater is not None:
+                await self._application.updater.start_polling()
             logger.info("Telegram bot started polling")
 
     async def stop(self) -> None:
         """Stop the bot polling."""
-        if self._application:
-            await self._application.updater.stop()
+        if self._application is not None:
+            if self._application.updater is not None:
+                await self._application.updater.stop()
             await self._application.stop()
             await self._application.shutdown()
             logger.info("Telegram bot stopped")

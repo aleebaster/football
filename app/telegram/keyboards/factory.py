@@ -1,12 +1,11 @@
 """Keyboard factory for creating Telegram keyboards."""
 
-from telegram import (
-    InlineKeyboardButton,
-    InlineKeyboardMarkup,
-)
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 
-def create_inline_keyboard(rows: list[list[tuple[str, str]]]) -> InlineKeyboardMarkup:
+def create_inline_keyboard(
+    rows: list[list[tuple[str, str]]],
+) -> InlineKeyboardMarkup:
     """Create inline keyboard from rows of (text, callback_data) tuples.
 
     Args:
@@ -15,10 +14,11 @@ def create_inline_keyboard(rows: list[list[tuple[str, str]]]) -> InlineKeyboardM
     Returns:
         InlineKeyboardMarkup instance.
     """
-    keyboard = []
+    keyboard: list[list[InlineKeyboardButton]] = []
     for row in rows:
         buttons = [
-            InlineKeyboardButton(text=text, callback_data=data) for text, data in row
+            InlineKeyboardButton(text=text, callback_data=data)
+            for text, data in row
         ]
         keyboard.append(buttons)
     return InlineKeyboardMarkup(keyboard)

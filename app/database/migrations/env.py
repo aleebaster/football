@@ -1,22 +1,15 @@
-"""Alembic environment configuration.
-
-Configures Alembic for async database migrations with SQLAlchemy.
-"""
+"""Alembic environment configuration."""
 
 import asyncio
 from logging.config import fileConfig
 
 from alembic import context
+from sqlalchemy import Connection
 
 from app.config import settings
 from app.database.base import Base
 
-# Import all models here to ensure they are registered with Base.metadata
-# from app.database.models import *  # noqa: F401, F403
-
 config = context.config
-
-# Set the database URL from application settings
 config.set_main_option("sqlalchemy.url", settings.database.url)
 
 if config.config_file_name is not None:
@@ -26,10 +19,7 @@ target_metadata = Base.metadata
 
 
 def run_migrations_offline() -> None:
-    """Run migrations in 'offline' mode.
-
-    Configures the context with just a URL and not an Engine.
-    """
+    """Run migrations in 'offline' mode."""
     url = config.get_main_option("sqlalchemy.url")
     context.configure(
         url=url,
@@ -42,7 +32,7 @@ def run_migrations_offline() -> None:
         context.run_migrations()
 
 
-def do_run_migrations(connection: object) -> None:
+def do_run_migrations(connection: Connection) -> None:
     """Run migrations with a connection."""
     context.configure(connection=connection, target_metadata=target_metadata)
 

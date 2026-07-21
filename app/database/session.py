@@ -1,8 +1,4 @@
-"""Database session management.
-
-Provides async session management for SQLAlchemy with support
-for multiple database backends (SQLite, PostgreSQL).
-"""
+"""Database session management."""
 
 from collections.abc import AsyncGenerator
 
@@ -17,29 +13,21 @@ from app.config import settings
 
 
 class DatabaseSessionManager:
-    """Manages database engine and sessions.
-
-    Supports switching between SQLite and PostgreSQL without code changes.
-    Simply update the DATABASE_URL environment variable.
-    """
+    """Manages database engine and sessions."""
 
     def __init__(self, database_url: str | None = None) -> None:
-        """Initialize the database session manager.
-
-        Args:
-            database_url: Optional database URL override.
-        """
-        self._url = database_url or settings.database.url
+        """Initialize the database session manager."""
+        self._url: str = database_url or settings.database.url
         self._engine: AsyncEngine | None = None
         self._session_factory: async_sessionmaker[AsyncSession] | None = None
 
     async def connect(self) -> None:
         """Create database engine and session factory."""
-        connect_args = {}
+        connect_args: dict[str, bool] = {}
         if "sqlite" in self._url:
             connect_args["check_same_thread"] = False
 
-        engine_kwargs = {
+        engine_kwargs: dict[str, object] = {
             "echo": settings.database.echo,
             "connect_args": connect_args,
         }
@@ -47,7 +35,7 @@ class DatabaseSessionManager:
             engine_kwargs["pool_size"] = settings.database.pool_size
             engine_kwargs["max_overflow"] = settings.database.max_overflow
 
-        self._engine = create_async_engine(self._url, **engine_kwargs)
+        self._engine = create_async_engine(self._url, **engine_kwargs)  # type: ignore[arg-type]
         self._session_factory = async_sessionmaker(
             bind=self._engine,
             class_=AsyncSession,
@@ -56,31 +44,20 @@ class DatabaseSessionManager:
 
     async def disconnect(self) -> None:
         """Dispose of the database engine."""
-        if self._engine:
+        if self._engine is not None:
             await self._engine.dispose()
             self._engine = None
             self._session_factory = None
 
     @property
     def engine(self) -> AsyncEngine:
-        """Get the async engine instance.
-
-        Returns:
-            AsyncEngine: The database engine.
-
-        Raises:
-            RuntimeError: If engine is not initialized.
-        """
+        """Get the async engine instance."""
         if self._engine is None:
             raise RuntimeError("Database not connected. Call connect() first.")
         return self._engine
 
     async def get_session(self) -> AsyncGenerator[AsyncSession, None]:
-        """Get a database session.
-
-        Yields:
-            AsyncSession: A database session.
-        """
+        """Get a database session."""
         if self._session_factory is None:
             raise RuntimeError("Database not connected. Call connect() first.")
 
@@ -96,19 +73,15 @@ class DatabaseSessionManager:
         """Create all database tables."""
         from app.database.base import Base
 
-        async with self._engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
+        if self._engine is not None:
+            async with self._engine.begin() as conn:
+                await conn.run_sync(Base.metadata.create_all)
 
 
-# Global database session manager instance
 db_manager = DatabaseSessionManager()
 
 
 async def get_session() -> AsyncGenerator[AsyncSession, None]:
-    """Dependency for getting database sessions.
-
-    Yields:
-        AsyncSession: A database session.
-    """
+    """Dependency for getting database sessions."""
     async for session in db_manager.get_session():
         yield session
