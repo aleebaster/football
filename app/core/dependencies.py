@@ -21,6 +21,7 @@ _cache: CacheManager | None = None
 _provider_registry: ProviderRegistry | None = None
 _provider_manager: ProviderManager | None = None
 _ai_engine: Any = None
+_prediction_engine: Any = None
 
 
 def get_cache_manager() -> CacheManager:
@@ -105,6 +106,19 @@ def get_ai_engine() -> Any:
             cache_manager=get_cache_manager(),
         )
     return _ai_engine
+
+
+def get_prediction_engine() -> Any:
+    """Get or create the global Prediction Engine."""
+    global _prediction_engine
+    if _prediction_engine is None:
+        from app.prediction.engine import PredictionEngine
+
+        _prediction_engine = PredictionEngine(
+            ai_engine=get_ai_engine(),
+            cache_manager=get_cache_manager(),
+        )
+    return _prediction_engine
 
 
 def register_default_providers() -> None:
