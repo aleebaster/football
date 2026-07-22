@@ -4,6 +4,7 @@ Provides injectable dependencies for services and utilities.
 """
 
 from collections.abc import AsyncGenerator
+from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -19,6 +20,7 @@ from app.providers.registry import ProviderRegistry
 _cache: CacheManager | None = None
 _provider_registry: ProviderRegistry | None = None
 _provider_manager: ProviderManager | None = None
+_ai_engine: Any = None
 
 
 def get_cache_manager() -> CacheManager:
@@ -90,6 +92,19 @@ def get_provider_manager() -> ProviderManager:
             cache=get_provider_cache(),
         )
     return _provider_manager
+
+
+def get_ai_engine() -> Any:
+    """Get or create the global AI engine."""
+    global _ai_engine
+    if _ai_engine is None:
+        from app.ai.engine import AIEngine
+
+        _ai_engine = AIEngine(
+            provider_manager=get_provider_manager(),
+            cache_manager=get_cache_manager(),
+        )
+    return _ai_engine
 
 
 def register_default_providers() -> None:
