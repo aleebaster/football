@@ -38,6 +38,8 @@ class ProviderManager:
         """Start all registered providers (open HTTP clients)."""
         if self._started:
             return
+        self._degraded = False
+        self._degraded_reason = None
         failed: list[str] = []
         for provider in self._registry.get_all():
             if hasattr(provider, "start"):
@@ -46,11 +48,11 @@ class ProviderManager:
                     logger.info(f"Started provider: {provider.name}")
                 except Exception as e:
                     logger.error(f"Failed to start provider {provider.name}: {e}")
-                    failed.append(provider.name)
+                    failed.append(f"{provider.name}: {e}")
         self._started = True
         if failed:
             self._degraded = True
-            self._degraded_reason = f"Failed to start: {', '.join(failed)}"
+            self._degraded_reason = f"Failed to start: {'; '.join(failed)}"
             logger.warning(
                 f"ProviderManager started in DEGRADED MODE: {self._degraded_reason}"
             )

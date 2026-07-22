@@ -380,6 +380,34 @@ class TestProviderManager:
         await mgr.stop()
         assert bad.stop_called is True
 
+    @pytest.mark.asyncio
+    async def test_degraded_mode_all_providers_fail(self) -> None:
+        """If ALL providers fail to start, manager enters DEGRADED MODE."""
+        bad1 = FailingStartProvider("bad1", priority=10)
+        bad2 = FailingStartProvider("bad2", priority=20)
+
+        reg = ProviderRegistry()
+        reg.register(bad1)
+        reg.register(bad2)
+        cache = _make_provider_cache()
+        mgr = ProviderManager(reg, cache)
+
+        await mgr.start()
+        assert mgr.degraded is True
+        assert mgr.degraded_reason is not None
+        assert "bad1" in mgr.degraded_reason
+        assert "bad2" in mgr.degraded_reason
+        assert "Provider failed to start" in mgr.degraded_reason
+
+        report = mgr.get_health_report()
+        assert report["degraded"] is True
+        assert report["degraded_reason"] is not None
+
+        await mgr.stop()
+        # After stop, degraded should be reset
+        assert mgr.degraded is False
+        assert mgr.degraded_reason is None
+
 
 # ===== ProviderManager Fallback Tests =====
 
