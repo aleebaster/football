@@ -40,7 +40,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         register_default_providers()
         provider_manager = get_provider_manager()
         await provider_manager.start()
-        logger.info("Provider platform started")
+        if provider_manager.degraded:
+            logger.warning(
+                f"Application started in DEGRADED MODE: {provider_manager.degraded_reason}"
+            )
+        else:
+            logger.info("Provider platform started")
     except Exception as e:
         logger.error(f"Failed to start provider platform: {e}")
 

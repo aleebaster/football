@@ -49,6 +49,37 @@ def _make_slow_mock(name: str = "mock_slow", priority: int = 100) -> MockProvide
     return p
 
 
+class TrackableProvider(MockProvider):
+    """MockProvider that tracks start/stop calls."""
+
+    def __init__(self, name: str = "trackable", priority: int = 10) -> None:
+        super().__init__(priority=priority)
+        self._name = name
+        self.start_called = False
+        self.stop_called = False
+
+    async def start(self) -> None:
+        self.start_called = True
+
+    async def stop(self) -> None:
+        self.stop_called = True
+
+
+class FailingStartProvider(MockProvider):
+    """MockProvider that fails on start() but tracks stop()."""
+
+    def __init__(self, name: str = "failing", priority: int = 20) -> None:
+        super().__init__(priority=priority)
+        self._name = name
+        self.stop_called = False
+
+    async def start(self) -> None:
+        raise RuntimeError("Provider failed to start")
+
+    async def stop(self) -> None:
+        self.stop_called = True
+
+
 # ===== ProviderHealth Tests =====
 
 
@@ -291,6 +322,63 @@ class TestProviderManager:
         assert mgr._started is True
         await mgr.stop()
         assert mgr._started is False
+
+    @pytest.mark.asyncio
+    async def test_start_calls_provider_start(self) -> None:
+        """ProviderManager.start() must call start() on each provider."""
+        p1 = TrackableProvider("p1", priority=10)
+        p2 = TrackableProvider("p2", priority=20)
+
+        reg = ProviderRegistry()
+        reg.register(p1)
+        reg.register(p2)
+        cache = _make_provider_cache()
+        mgr = ProviderManager(reg, cache)
+
+        await mgr.start()
+        assert p1.start_called is True
+        assert p2.start_called is True
+
+    @pytest.mark.asyncio
+    async def test_stop_calls_provider_stop(self) -> None:
+        """ProviderManager.stop() must call stop() on each provider."""
+        p1 = TrackableProvider("p1", priority=10)
+        p2 = TrackableProvider("p2", priority=20)
+
+        reg = ProviderRegistry()
+        reg.register(p1)
+        reg.register(p2)
+        cache = _make_provider_cache()
+        mgr = ProviderManager(reg, cache)
+
+        await mgr.start()
+        await mgr.stop()
+        assert p1.stop_called is True
+        assert p2.stop_called is True
+
+    @pytest.mark.asyncio
+    async def test_degraded_mode_on_start_failure(self) -> None:
+        """If a provider fails to start, manager enters DEGRADED MODE."""
+        good = TrackableProvider("good", priority=10)
+        bad = FailingStartProvider("bad", priority=20)
+
+        reg = ProviderRegistry()
+        reg.register(good)
+        reg.register(bad)
+        cache = _make_provider_cache()
+        mgr = ProviderManager(reg, cache)
+
+        await mgr.start()
+        # Good provider should have been started despite bad failing
+        assert good.start_called is True
+        assert mgr.degraded is True
+        assert "bad" in (mgr.degraded_reason or "")
+        report = mgr.get_health_report()
+        assert report["degraded"] is True
+        assert report["degraded_reason"] is not None
+
+        await mgr.stop()
+        assert bad.stop_called is True
 
 
 # ===== ProviderManager Fallback Tests =====

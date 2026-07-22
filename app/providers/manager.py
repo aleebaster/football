@@ -31,11 +31,14 @@ class ProviderManager:
         self._registry = registry
         self._cache = cache
         self._started = False
+        self._degraded = False
+        self._degraded_reason: str | None = None
 
     async def start(self) -> None:
         """Start all registered providers (open HTTP clients)."""
         if self._started:
             return
+        failed: list[str] = []
         for provider in self._registry.get_all():
             if hasattr(provider, "start"):
                 try:
@@ -43,8 +46,16 @@ class ProviderManager:
                     logger.info(f"Started provider: {provider.name}")
                 except Exception as e:
                     logger.error(f"Failed to start provider {provider.name}: {e}")
+                    failed.append(provider.name)
         self._started = True
-        logger.info(f"ProviderManager started ({len(self._registry)} providers)")
+        if failed:
+            self._degraded = True
+            self._degraded_reason = f"Failed to start: {', '.join(failed)}"
+            logger.warning(
+                f"ProviderManager started in DEGRADED MODE: {self._degraded_reason}"
+            )
+        else:
+            logger.info(f"ProviderManager started ({len(self._registry)} providers)")
 
     async def stop(self) -> None:
         """Stop all registered providers (close HTTP clients)."""
@@ -58,6 +69,8 @@ class ProviderManager:
                 except Exception as e:
                     logger.error(f"Failed to stop provider {provider.name}: {e}")
         self._started = False
+        self._degraded = False
+        self._degraded_reason = None
         logger.info("ProviderManager stopped")
 
     def _get_active_providers(self) -> list[BaseProvider]:
@@ -194,6 +207,16 @@ class ProviderManager:
         result = await self._execute_with_fallback("search", query)
         return list(result)
 
+    @property
+    def degraded(self) -> bool:
+        """Check if the manager is running in degraded mode."""
+        return self._degraded
+
+    @property
+    def degraded_reason(self) -> str | None:
+        """Get the reason for degraded mode."""
+        return self._degraded_reason
+
     def get_health_report(self) -> dict[str, Any]:
         providers = self._registry.get_all()
         return {
@@ -202,5 +225,7 @@ class ProviderManager:
             "healthy": len(
                 [p for p in providers if p.health_info.status == ProviderStatus.HEALTHY]
             ),
+            "degraded": self._degraded,
+            "degraded_reason": self._degraded_reason,
             "providers": {p.name: p.health_info.to_dict() for p in providers},
         }
