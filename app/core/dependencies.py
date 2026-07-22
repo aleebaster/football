@@ -11,9 +11,14 @@ from app.cache.base import CacheManager
 from app.cache.memory import MemoryCache
 from app.config import settings
 from app.database.session import db_manager
+from app.providers.cache import ProviderCache
+from app.providers.manager import ProviderManager
+from app.providers.registry import ProviderRegistry
 
-# Global cache instance
+# Global instances
 _cache: CacheManager | None = None
+_provider_registry: ProviderRegistry | None = None
+_provider_manager: ProviderManager | None = None
 
 
 def get_cache_manager() -> CacheManager:
@@ -49,3 +54,69 @@ def get_cache() -> CacheManager:
         CacheManager instance.
     """
     return get_cache_manager()
+
+
+def get_provider_registry() -> ProviderRegistry:
+    """Get or create the global provider registry.
+
+    Returns:
+        ProviderRegistry instance.
+    """
+    global _provider_registry
+    if _provider_registry is None:
+        _provider_registry = ProviderRegistry()
+    return _provider_registry
+
+
+def get_provider_cache() -> ProviderCache:
+    """Get or create the provider cache.
+
+    Returns:
+        ProviderCache instance.
+    """
+    return ProviderCache(get_cache_manager())
+
+
+def get_provider_manager() -> ProviderManager:
+    """Get or create the global provider manager.
+
+    Returns:
+        ProviderManager instance.
+    """
+    global _provider_manager
+    if _provider_manager is None:
+        _provider_manager = ProviderManager(
+            registry=get_provider_registry(),
+            cache=get_provider_cache(),
+        )
+    return _provider_manager
+
+
+def register_default_providers() -> None:
+    """Register default providers based on configuration."""
+    registry = get_provider_registry()
+
+    from app.providers.adapters.mock_provider import MockProvider
+
+    if len(registry) == 0:
+        registry.register(MockProvider(priority=100))
+
+    if settings.provider.api_football_key:
+        from app.providers.adapters.api_football import ApiFootballProvider
+
+        registry.register(
+            ApiFootballProvider(
+                api_key=settings.provider.api_football_key,
+                priority=10,
+            )
+        )
+
+    if settings.provider.football_data_key:
+        from app.providers.adapters.football_data import FootballDataProvider
+
+        registry.register(
+            FootballDataProvider(
+                api_key=settings.provider.football_data_key,
+                priority=20,
+            )
+        )

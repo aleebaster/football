@@ -90,6 +90,24 @@ class AnalysisSettings(BaseSettings):
     min_profit: float = Field(default=3.0, description="Minimum profit threshold")
 
 
+class ProviderSettings(BaseSettings):
+    """Data provider configuration."""
+
+    model_config = SettingsConfigDict(env_prefix="PROVIDER_")
+
+    api_football_key: str = Field(default="", description="API-Football API key")
+    football_data_key: str = Field(default="", description="Football-Data.org API key")
+    primary_provider: str = Field(default="mock", description="Primary data provider")
+    cache_ttl_live: int = Field(default=30, description="Live data cache TTL")
+    cache_ttl_fixtures: int = Field(default=300, description="Fixtures cache TTL")
+    cache_ttl_standings: int = Field(default=3600, description="Standings cache TTL")
+    cache_ttl_teams: int = Field(default=86400, description="Teams cache TTL")
+    sync_interval: int = Field(default=300, description="Sync interval in seconds")
+    health_check_interval: int = Field(default=60, description="Health check interval")
+    rate_limit: float = Field(default=10.0, description="API rate limit per second")
+    max_retries: int = Field(default=3, description="Max retries per request")
+
+
 class Settings(BaseSettings):
     """Main application settings."""
 
@@ -120,6 +138,7 @@ class Settings(BaseSettings):
     scheduler: SchedulerSettings = Field(default_factory=SchedulerSettings)
     dashboard: DashboardSettings = Field(default_factory=DashboardSettings)
     analysis: AnalysisSettings = Field(default_factory=AnalysisSettings)
+    provider: ProviderSettings = Field(default_factory=ProviderSettings)
 
     def model_post_init(self, __context: object) -> None:
         """Create necessary directories after initialization."""

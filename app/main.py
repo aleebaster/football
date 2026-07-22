@@ -7,7 +7,11 @@ import uvicorn
 from fastapi import FastAPI
 
 from app.config import settings
-from app.core.dependencies import get_cache_manager
+from app.core.dependencies import (
+    get_cache_manager,
+    get_provider_manager,
+    register_default_providers,
+)
 from app.database.session import db_manager
 from app.logging import get_logger
 from app.logging.config import setup_logging
@@ -30,11 +34,27 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     await db_manager.create_tables()
     logger.info("Database tables created")
 
+    # Initialize provider platform
+    provider_manager = None
+    try:
+        register_default_providers()
+        provider_manager = get_provider_manager()
+        await provider_manager.start()
+        logger.info("Provider platform started")
+    except Exception as e:
+        logger.error(f"Failed to start provider platform: {e}")
+
     logger.info("Application started successfully")
 
     yield
 
     logger.info("Shutting down application...")
+
+    # Stop provider platform
+    if provider_manager is not None:
+        await provider_manager.stop()
+        logger.info("Provider platform stopped")
+
     await db_manager.disconnect()
     logger.info("Database disconnected")
     logger.info("Application shut down successfully")
