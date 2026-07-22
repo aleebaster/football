@@ -17,8 +17,8 @@ def get_settings_menu_keyboard() -> object:
                 ("🎨 Тема", SettingsCallback.THEME.value),
             ],
             [
-                ("⬅️ Назад", MenuCallback.MAIN_MENU.value),
-                ("🏠 Головне меню", MenuCallback.HOME.value),
+                ("⬅️ Назад", MenuCallback.BACK.value),
+                ("🏠 Головне меню", MenuCallback.MAIN.value),
             ],
         ]
     )

@@ -16,8 +16,8 @@ def get_ai_menu_keyboard() -> object:
                 ("📊 Патерни", AICallback.PATTERNS.value),
             ],
             [
-                ("⬅️ Назад", MenuCallback.MAIN_MENU.value),
-                ("🏠 Головне меню", MenuCallback.HOME.value),
+                ("⬅️ Назад", MenuCallback.BACK.value),
+                ("🏠 Головне меню", MenuCallback.MAIN.value),
             ],
         ]
     )

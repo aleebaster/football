@@ -17,8 +17,8 @@ def get_market_menu_keyboard() -> object:
                 ("📊 Найбільші зміни", MarketCallback.CHANGES.value),
             ],
             [
-                ("⬅️ Назад", MenuCallback.MAIN_MENU.value),
-                ("🏠 Головне меню", MenuCallback.HOME.value),
+                ("⬅️ Назад", MenuCallback.BACK.value),
+                ("🏠 Головне меню", MenuCallback.MAIN.value),
             ],
         ]
     )

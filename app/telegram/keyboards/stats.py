@@ -16,8 +16,8 @@ def get_stats_menu_keyboard() -> object:
                 ("💾 Експорт", StatsCallback.EXPORT.value),
             ],
             [
-                ("⬅️ Назад", MenuCallback.MAIN_MENU.value),
-                ("🏠 Головне меню", MenuCallback.HOME.value),
+                ("⬅️ Назад", MenuCallback.BACK.value),
+                ("🏠 Головне меню", MenuCallback.MAIN.value),
             ],
         ]
     )

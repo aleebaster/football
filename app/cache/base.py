@@ -92,6 +92,30 @@ class CacheManager:
         """Get the cache backend."""
         return self._backend
 
+    async def get(self, key: str) -> Any | None:
+        """Get value by key."""
+        return await self._backend.get(key)
+
+    async def set(self, key: str, value: Any, ttl: int | None = None) -> None:
+        """Set value with optional TTL."""
+        await self._backend.set(key, value, ttl)
+
+    async def delete(self, key: str) -> bool:
+        """Delete value by key."""
+        return await self._backend.delete(key)
+
+    async def clear(self) -> None:
+        """Clear all cached values."""
+        await self._backend.clear()
+
+    async def exists(self, key: str) -> bool:
+        """Check if key exists."""
+        return await self._backend.exists(key)
+
+    async def keys(self, pattern: str = "*") -> list[str]:
+        """Get all keys matching pattern."""
+        return await self._backend.keys(pattern)
+
     async def get_or_set(
         self,
         key: str,

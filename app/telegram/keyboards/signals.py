@@ -14,11 +14,11 @@ def get_signals_menu_keyboard() -> object:
             ],
             [
                 ("⭐ Улюблені", SignalsCallback.FAVORITES.value),
-                ("⚙️ Налаштування", SignalsCallback.SETTINGS.value),
+                ("⚙️ Налаштування", MenuCallback.BACK.value),
             ],
             [
-                ("⬅️ Назад", MenuCallback.MAIN_MENU.value),
-                ("🏠 Головне меню", MenuCallback.HOME.value),
+                ("⬅️ Назад", MenuCallback.BACK.value),
+                ("🏠 Головне меню", MenuCallback.MAIN.value),
             ],
         ]
     )

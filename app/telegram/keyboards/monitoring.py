@@ -14,11 +14,11 @@ def get_monitoring_menu_keyboard() -> object:
             ],
             [
                 ("📋 Список", MonitoringCallback.LIST.value),
-                ("🔄 Автооновлення", MonitoringCallback.AUTO_UPDATE.value),
+                ("🔄 Автооновлення", MonitoringCallback.AUTO.value),
             ],
             [
-                ("⬅️ Назад", MenuCallback.MAIN_MENU.value),
-                ("🏠 Головне меню", MenuCallback.HOME.value),
+                ("⬅️ Назад", MenuCallback.BACK.value),
+                ("🏠 Головне меню", MenuCallback.MAIN.value),
             ],
         ]
     )

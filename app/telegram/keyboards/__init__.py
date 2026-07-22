@@ -1,5 +1,14 @@
-"""Telegram keyboards package."""
+"""Telegram keyboards package.
 
-from app.telegram.keyboards.factory import create_inline_keyboard
+Provides centralized keyboard creation through KeyboardFactory.
+"""
 
-__all__ = ["create_inline_keyboard"]
+from app.telegram.keyboards.factory import (
+    KeyboardFactory,
+    create_inline_keyboard,
+)
+
+__all__ = [
+    "KeyboardFactory",
+    "create_inline_keyboard",
+]

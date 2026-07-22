@@ -16,8 +16,8 @@ def get_top_menu_keyboard() -> object:
                 ("⚽ ТОП команд", TopCallback.TEAMS.value),
             ],
             [
-                ("⬅️ Назад", MenuCallback.MAIN_MENU.value),
-                ("🏠 Головне меню", MenuCallback.HOME.value),
+                ("⬅️ Назад", MenuCallback.BACK.value),
+                ("🏠 Головне меню", MenuCallback.MAIN.value),
             ],
         ]
     )
