@@ -303,12 +303,12 @@ class TestBacktestDataset:
             await dataset.load(req)
 
     @pytest.mark.asyncio
-    async def test_count_raises_without_provider(self) -> None:
-        """Count raises BacktestDatasetError when no provider is available."""
+    async def test_count_returns_zero_without_provider(self) -> None:
+        """Count returns 0 when no provider is available (safe behavior)."""
         dataset = BacktestDataset()
         req = _make_backtest_request(BacktestScope.SINGLE_MATCH, fixture_id=1000)
-        with pytest.raises(BacktestDatasetError):
-            await dataset.count(req)
+        count = await dataset.count(req)
+        assert count == 0
 
     def test_dataset_requires_provider(self) -> None:
         """Dataset requires a provider manager for operations."""
@@ -513,6 +513,110 @@ class TestBacktestStatistics:
         results = _make_mixed_evaluations(10)
         predictor_stats = stats.calculate_by_predictor(results)
         assert len(predictor_stats) > 0
+
+
+# ===== Integration Tests =====
+
+
+class TestBacktestIntegration:
+    """Integration tests for the full backtesting pipeline."""
+
+    @pytest.mark.asyncio
+    async def test_statistics_delegates_to_metrics(self) -> None:
+        """Verify Statistics delegates to MetricsCalculator."""
+        from app.backtesting.metrics import BacktestMetricsCalculator
+
+        metrics_calc = BacktestMetricsCalculator()
+        stats = BacktestStatistics(metrics_calculator=metrics_calc)
+        results = _make_mixed_evaluations(10)
+
+        # Both should produce the same confidence buckets
+        cal_buckets = metrics_calc.calculate_calibration_buckets(results)
+        stat_buckets = stats.calculate_by_confidence_bucket(results)
+        assert len(stat_buckets) == len(cal_buckets)
+
+    @pytest.mark.asyncio
+    async def test_full_pipeline_metrics_and_reporting(self) -> None:
+        """Test full pipeline: evaluations → metrics → reporting."""
+        calc = BacktestMetricsCalculator()
+        reporter = BacktestReporter()
+        results = _make_mixed_evaluations(20)
+
+        # Calculate metrics
+        metrics = await calc.calculate(results)
+        assert metrics.total_predictions == 20
+        assert 0 < metrics.win_rate < 1
+
+        # Create result and generate report
+        backtest_result = BacktestResult(
+            request=_make_backtest_request(),
+            evaluations=results,
+            metrics=metrics,
+        )
+        summary = await reporter.generate(backtest_result)
+        assert summary.total_evaluations == 20
+        assert summary.metrics.win_rate == metrics.win_rate
+
+    @pytest.mark.asyncio
+    async def test_full_pipeline_calibration_and_persistence(self) -> None:
+        """Test full pipeline: evaluations → calibration → persistence."""
+        calc = BacktestMetricsCalculator()
+        cal = BacktestCalibration()
+        persistence = BacktestPersistence()
+        results = _make_correct_evaluations(5)
+
+        # Calculate metrics
+        metrics = await calc.calculate(results)
+
+        # Create and persist result
+        backtest_result = BacktestResult(
+            request=_make_backtest_request(),
+            evaluations=results,
+            metrics=metrics,
+        )
+        result_id = await persistence.save(backtest_result)
+        assert result_id is not None
+
+        # Collect calibration data
+        entries = await cal.collect(backtest_result)
+        assert len(entries) == 5
+
+        # Retrieve persisted result
+        retrieved = await persistence.get(result_id)
+        assert retrieved is not None
+        assert len(retrieved.evaluations) == 5
+
+    @pytest.mark.asyncio
+    async def test_pipeline_metrics_statistics_reporting(self) -> None:
+        """Test: evaluations → metrics → statistics → reporting."""
+        calc = BacktestMetricsCalculator()
+        stats = BacktestStatistics(metrics_calculator=calc)
+        reporter = BacktestReporter()
+        results = _make_mixed_evaluations(15)
+
+        # Calculate metrics
+        metrics = await calc.calculate(results)
+        assert metrics.total_predictions == 15
+
+        # Calculate statistics
+        market_stats = stats.calculate_by_market(results)
+        assert len(market_stats) >= 1
+
+        predictor_stats = stats.calculate_by_predictor(results)
+        assert len(predictor_stats) >= 1
+
+        # Generate report
+        backtest_result = BacktestResult(
+            request=_make_backtest_request(),
+            evaluations=results,
+            metrics=metrics,
+        )
+        summary = await reporter.generate(backtest_result)
+        assert summary.total_evaluations == 15
+
+        # Format report text
+        text = reporter.format_text_report(summary)
+        assert "BACKTEST REPORT" in text
 
 
 # ===== Property-Based Tests =====

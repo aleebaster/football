@@ -64,9 +64,17 @@ class BacktestDataset:
             return None
 
     async def count(self, request: BacktestRequest) -> int:
-        """Count matches in the dataset for a request."""
-        matches = await self.load(request)
-        return len(matches)
+        """Count matches in the dataset for a request.
+
+        Returns 0 if no provider is available (safe behavior).
+        """
+        if self._provider_manager is None:
+            return 0
+        try:
+            matches = await self.load(request)
+            return len(matches)
+        except BacktestDatasetError:
+            return 0
 
     async def _fetch_matches(self, request: BacktestRequest) -> list[dict[str, Any]]:
         """Fetch matches based on scope."""

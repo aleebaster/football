@@ -2,12 +2,33 @@
 
 All services are assembled here in a single place.
 Every engine (AI, Prediction, Signal, Backtesting) shares the same instances.
+All properties return their concrete types for full MyPy benefit.
 """
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 from app.cache.base import CacheManager
 from app.cache.memory import MemoryCache
 from app.config import settings
 from app.logging import get_logger
+from app.providers.cache import ProviderCache
+from app.providers.manager import ProviderManager
+from app.providers.registry import ProviderRegistry
+
+if TYPE_CHECKING:
+    from app.ai.engine import AIEngine
+    from app.backtesting.calibration import BacktestCalibration
+    from app.backtesting.engine import BacktestEngine
+    from app.backtesting.evaluator import BacktestEvaluator
+    from app.backtesting.metrics import BacktestMetricsCalculator
+    from app.backtesting.orchestrator import BacktestOrchestrator
+    from app.backtesting.persistence import BacktestPersistence
+    from app.backtesting.reporting import BacktestReporter
+    from app.backtesting.runner import BacktestRunner
+    from app.prediction.engine import PredictionEngine
+    from app.signals.engine import SignalEngine
 
 logger = get_logger(__name__)
 
@@ -15,24 +36,24 @@ logger = get_logger(__name__)
 class Container:
     """Central DI container — single source of truth for all service instances.
 
+    All properties return concrete types for type safety.
     Usage:
-        container = Container.create()
-        ai_engine = container.ai_engine
-        prediction_engine = container.prediction_engine
-        signal_engine = container.signal_engine
-        backtest_engine = container.backtest_engine
+        container = get_container()
+        ai = container.ai_engine
+        prediction = container.prediction_engine
+        signal = container.signal_engine
+        backtest = container.backtest_engine
     """
 
     def __init__(self) -> None:
-        # Lazy-initialized singletons
         self._cache_manager: CacheManager | None = None
-        self._provider_registry: object | None = None
-        self._provider_cache: object | None = None
-        self._provider_manager: object | None = None
-        self._ai_engine: object | None = None
-        self._prediction_engine: object | None = None
-        self._signal_engine: object | None = None
-        self._backtest_engine: object | None = None
+        self._provider_registry: ProviderRegistry | None = None
+        self._provider_cache: ProviderCache | None = None
+        self._provider_manager: ProviderManager | None = None
+        self._ai_engine: AIEngine | None = None
+        self._prediction_engine: PredictionEngine | None = None
+        self._signal_engine: SignalEngine | None = None
+        self._backtest_engine: BacktestEngine | None = None
 
     # ── Cache ────────────────────────────────────────────────────────
 
@@ -49,41 +70,35 @@ class Container:
     # ── Providers ────────────────────────────────────────────────────
 
     @property
-    def provider_registry(self) -> object:
+    def provider_registry(self) -> ProviderRegistry:
         if self._provider_registry is None:
-            from app.providers.registry import ProviderRegistry
-
             self._provider_registry = ProviderRegistry()
         return self._provider_registry
 
     @property
-    def provider_cache(self) -> object:
+    def provider_cache(self) -> ProviderCache:
         if self._provider_cache is None:
-            from app.providers.cache import ProviderCache
-
             self._provider_cache = ProviderCache(self.cache_manager)
         return self._provider_cache
 
     @property
-    def provider_manager(self) -> object:
+    def provider_manager(self) -> ProviderManager:
         if self._provider_manager is None:
-            from app.providers.manager import ProviderManager
-
             self._provider_manager = ProviderManager(
-                registry=self.provider_registry,  # type: ignore[arg-type]
-                cache=self.provider_cache,  # type: ignore[arg-type]
+                registry=self.provider_registry,
+                cache=self.provider_cache,
             )
         return self._provider_manager
 
     # ── AI Engine ────────────────────────────────────────────────────
 
     @property
-    def ai_engine(self) -> object:
+    def ai_engine(self) -> AIEngine:
         if self._ai_engine is None:
             from app.ai.engine import AIEngine
 
             self._ai_engine = AIEngine(
-                provider_manager=self.provider_manager,  # type: ignore[arg-type]
+                provider_manager=self.provider_manager,
                 cache_manager=self.cache_manager,
             )
         return self._ai_engine
@@ -91,12 +106,12 @@ class Container:
     # ── Prediction Engine ────────────────────────────────────────────
 
     @property
-    def prediction_engine(self) -> object:
+    def prediction_engine(self) -> PredictionEngine:
         if self._prediction_engine is None:
             from app.prediction.engine import PredictionEngine
 
             self._prediction_engine = PredictionEngine(
-                ai_engine=self.ai_engine,  # type: ignore[arg-type]
+                ai_engine=self.ai_engine,
                 cache_manager=self.cache_manager,
             )
         return self._prediction_engine
@@ -104,7 +119,7 @@ class Container:
     # ── Signal Engine ────────────────────────────────────────────────
 
     @property
-    def signal_engine(self) -> object:
+    def signal_engine(self) -> SignalEngine:
         if self._signal_engine is None:
             from app.signals.cooldown import CooldownManager
             from app.signals.deduplication import DeduplicationManager
@@ -138,59 +153,89 @@ class Container:
     # ── Backtesting Engine ───────────────────────────────────────────
 
     @property
-    def backtest_engine(self) -> object:
+    def backtest_engine(self) -> BacktestEngine:
         if self._backtest_engine is None:
-            from app.backtesting.cache import BacktestCache
-            from app.backtesting.calibration import BacktestCalibration
-            from app.backtesting.dataset import BacktestDataset
             from app.backtesting.engine import BacktestEngine
-            from app.backtesting.evaluator import BacktestEvaluator
-            from app.backtesting.metrics import BacktestMetricsCalculator
-            from app.backtesting.orchestrator import BacktestOrchestrator
-            from app.backtesting.persistence import BacktestPersistence
-            from app.backtesting.reporting import BacktestReporter
-            from app.backtesting.runner import BacktestRunner
-            from app.backtesting.statistics import BacktestStatistics
-            from app.backtesting.validator import BacktestValidator
 
-            # Shared components
-            evaluator = BacktestEvaluator()
-            metrics = BacktestMetricsCalculator()
-            persistence = BacktestPersistence()
-            calibration = BacktestCalibration()
-            statistics = BacktestStatistics()
-            dataset = BacktestDataset(self.provider_manager)  # type: ignore[arg-type]
-
-            runner = BacktestRunner(
-                prediction_engine=self.prediction_engine,  # type: ignore[arg-type]
-                signal_engine=self.signal_engine,  # type: ignore[arg-type]
-                dataset=dataset,
-                evaluator=evaluator,
-            )
-
-            orchestrator = BacktestOrchestrator(
-                runner=runner,
-                evaluator=evaluator,
-                metrics_calculator=metrics,
-                reporter=BacktestReporter(metrics),
-                validator=BacktestValidator(),
-                persistence=persistence,
-                calibration=calibration,
-            )
-
-            self._backtest_engine = BacktestEngine(
-                prediction_engine=self.prediction_engine,  # type: ignore[arg-type]
-                signal_engine=self.signal_engine,  # type: ignore[arg-type]
-                orchestrator=orchestrator,
-                evaluator=evaluator,
-                metrics=metrics,
-                reporter=BacktestReporter(metrics),
-                persistence=persistence,
-                calibration=calibration,
-                statistics=statistics,
-                cache=BacktestCache(self.cache_manager),
-            )
+            self._backtest_engine = self._build_backtest_engine(BacktestEngine)
         return self._backtest_engine
+
+    def _build_backtest_engine(
+        self, engine_cls: type[BacktestEngine]
+    ) -> BacktestEngine:
+        """Build the backtesting engine with all dependencies."""
+        from app.backtesting.calibration import BacktestCalibration
+        from app.backtesting.evaluator import BacktestEvaluator
+        from app.backtesting.metrics import BacktestMetricsCalculator
+        from app.backtesting.persistence import BacktestPersistence
+        from app.backtesting.reporting import BacktestReporter
+        from app.backtesting.statistics import BacktestStatistics
+
+        evaluator = BacktestEvaluator()
+        metrics = BacktestMetricsCalculator()
+        persistence = BacktestPersistence()
+        calibration = BacktestCalibration()
+        statistics = BacktestStatistics(metrics_calculator=metrics)
+        reporter = BacktestReporter(metrics)
+        runner = self._build_backtest_runner(evaluator)
+        orchestrator = self._build_backtest_orchestrator(
+            runner=runner,
+            evaluator=evaluator,
+            metrics_calculator=metrics,
+            reporter=reporter,
+            persistence=persistence,
+            calibration=calibration,
+        )
+
+        from app.backtesting.cache import BacktestCache
+
+        cache = BacktestCache(self.cache_manager)
+
+        return engine_cls(
+            orchestrator=orchestrator,
+            evaluator=evaluator,
+            metrics=metrics,
+            reporter=reporter,
+            persistence=persistence,
+            calibration=calibration,
+            statistics=statistics,
+            cache=cache,
+        )
+
+    def _build_backtest_runner(self, evaluator: BacktestEvaluator) -> BacktestRunner:
+        """Build the backtest runner."""
+        from app.backtesting.dataset import BacktestDataset
+        from app.backtesting.runner import BacktestRunner
+
+        return BacktestRunner(
+            prediction_engine=self.prediction_engine,
+            signal_engine=self.signal_engine,
+            dataset=BacktestDataset(self.provider_manager),
+            evaluator=evaluator,
+        )
+
+    def _build_backtest_orchestrator(
+        self,
+        runner: BacktestRunner,
+        evaluator: BacktestEvaluator,
+        metrics_calculator: BacktestMetricsCalculator,
+        reporter: BacktestReporter,
+        persistence: BacktestPersistence,
+        calibration: BacktestCalibration,
+    ) -> BacktestOrchestrator:
+        """Build the backtest orchestrator."""
+        from app.backtesting.orchestrator import BacktestOrchestrator
+        from app.backtesting.validator import BacktestValidator
+
+        return BacktestOrchestrator(
+            runner=runner,
+            evaluator=evaluator,
+            metrics_calculator=metrics_calculator,
+            reporter=reporter,
+            validator=BacktestValidator(),
+            persistence=persistence,
+            calibration=calibration,
+        )
 
     # ── Cleanup ──────────────────────────────────────────────────────
 
@@ -213,11 +258,7 @@ _container: Container | None = None
 
 
 def get_container() -> Container:
-    """Get the global container singleton.
-
-    Returns:
-        The global Container instance.
-    """
+    """Get the global container singleton."""
     global _container
     if _container is None:
         _container = Container()

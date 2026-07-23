@@ -199,6 +199,212 @@ registry = get_provider_registry()
 
 **Important**: Never create `ProviderManager` or provider instances directly. Always use the DI system.
 
+## Composition Root & DI Container
+
+The application uses a centralized Composition Root pattern implemented in `app/core/container.py`.
+
+### Container Architecture
+
+All services are assembled in a single `Container` class:
+
+```
+app/core/
+├── container.py      # Composition Root — single source of truth
+└── dependencies.py   # Public API — delegates to container
+```
+
+### How It Works
+
+1. **Container** creates and manages all singleton service instances
+2. **Lazy initialization** — services are created on first access
+3. **Type-safe** — all properties return concrete types (no `object` or `Any` casts)
+4. **Shared instances** — every engine (AI, Prediction, Signal, Backtesting) shares the same services
+
+```python
+from app.core.container import get_container
+
+container = get_container()
+
+# All engines share the same providers, cache, AI, etc.
+ai = container.ai_engine
+prediction = container.prediction_engine
+signal = container.signal_engine
+backtest = container.backtest_engine
+```
+
+### Dependency Injection Flow
+
+```
+Container (Composition Root)
+├── CacheManager (MemoryCache)
+├── ProviderRegistry
+│   ├── MockProvider
+│   ├── ApiFootballProvider
+│   └── FootballDataProvider
+├── ProviderCache
+├── ProviderManager
+├── AIEngine
+├── PredictionEngine
+├── SignalEngine
+└── BacktestEngine
+    ├── BacktestRunner
+    │   ├── BacktestDataset
+    │   └── BacktestEvaluator
+    └── BacktestOrchestrator
+```
+
+### Public API
+
+`app/core/dependencies.py` provides backward-compatible factory functions that delegate to the container:
+
+```python
+from app.core.dependencies import (
+    get_ai_engine,
+    get_prediction_engine,
+    get_signal_engine,
+    get_backtesting_engine,
+    get_provider_manager,
+)
+```
+
+**Important**: Never create engine instances directly. Always use the DI system.
+
+## Backtesting Platform
+
+The Backtesting Platform validates system quality against historical matches.
+
+### Pipeline
+
+```
+Historical Matches
+→ Provider Layer
+→ AI Analysis Engine
+→ Prediction Engine
+→ Signal Engine
+→ Backtesting Engine
+→ Metrics
+→ Reports
+→ Calibration Dataset
+```
+
+### Architecture
+
+```
+app/backtesting/
+├── engine.py          # BacktestEngine — main entry point
+├── orchestrator.py    # Coordinates full backtest pipeline
+├── runner.py          # Executes backtests across different scopes
+├── dataset.py         # Loads historical match data
+├── evaluator.py       # Evaluates individual predictions
+├── metrics.py         # Calculates aggregate metrics
+├── statistics.py      # Statistical analysis (delegates to metrics)
+├── reporting.py       # Generates reports (per league/team/market)
+├── calibration.py     # Collects calibration data for model training
+├── comparison.py      # Compares different engine versions
+├── exporter.py        # Export to CSV/JSON
+├── persistence.py     # Stores backtest results
+├── validator.py       # Validates backtest requests
+├── cache.py           # Backtest-specific caching
+├── registry.py        # Registry for backtest configurations
+├── history.py         # Tracks backtest run history
+└── models.py          # Pydantic models
+```
+
+### Core Components
+
+| Component | Purpose |
+|-----------|---------|
+| `BacktestEngine` | Main entry point, all deps injected via constructor |
+| `BacktestOrchestrator` | Coordinates the full pipeline |
+| `BacktestRunner` | Executes backtests (per match, league, date range) |
+| `BacktestDataset` | Loads historical data from providers |
+| `BacktestEvaluator` | Evaluates predictions against actual outcomes |
+| `BacktestMetricsCalculator` | Calculates aggregate metrics |
+| `BacktestStatistics` | Statistical analysis (delegates to MetricsCalculator) |
+| `BacktestReporter` | Generates reports per league/team/market/bucket |
+| `BacktestCalibration` | Collects calibration data for future model training |
+| `BacktestComparison` | Compares different engine versions |
+
+### Backtest Scopes
+
+| Scope | Description |
+|-------|-------------|
+| `SINGLE_MATCH` | Single fixture by ID |
+| `LEAGUE` | All matches in a league |
+| `SEASON` | All matches in a season |
+| `DATE_RANGE` | Matches within a date range |
+| `ALL` | All available matches |
+
+### Metrics
+
+| Metric | Description |
+|--------|-------------|
+| Win Rate | Percentage of correct predictions |
+| ROI | Return on investment |
+| Yield | ROI as percentage |
+| Brier Score | Probability calibration quality |
+| Log Loss | Logarithmic loss of predictions |
+| Calibration Error | Expected Calibration Error (ECE) |
+| Precision/Recall/F1 | Classification metrics |
+| Average Odds | Mean odds across predictions |
+| Average Confidence | Mean prediction confidence |
+| Average Risk | Mean risk assessment |
+
+### Reports
+
+| Report | Description |
+|--------|-------------|
+| Summary | Overall backtest results |
+| Per League | Statistics grouped by league |
+| Per Team | Statistics grouped by team |
+| Per Season | Statistics grouped by season |
+| Per Market | Statistics grouped by prediction market |
+| Per Predictor | Statistics grouped by model version |
+| Per Signal Generator | Statistics for signal vs non-signal predictions |
+| Per Confidence Bucket | Performance by confidence level |
+| Per Risk Bucket | Performance by risk level |
+
+### How to Run a Backtest
+
+```python
+from app.core.dependencies import get_backtesting_engine
+from app.backtesting.models import BacktestRequest, BacktestScope
+
+engine = get_backtesting_engine()
+
+# Single match backtest
+result = await engine.run(
+    BacktestRequest(scope=BacktestScope.SINGLE_MATCH, fixture_id=12345)
+)
+
+# League backtest
+result = await engine.run(
+    BacktestRequest(scope=BacktestScope.LEAGUE, league_id=1, max_matches=100)
+)
+
+# Date range backtest
+result = await engine.run(
+    BacktestRequest(
+        scope=BacktestScope.DATE_RANGE,
+        date_from="2024-01-01",
+        date_to="2024-06-30",
+    )
+)
+```
+
+### How to Add a New Metric
+
+1. Add metric fields to `BacktestMetrics` in `app/backtesting/models.py`
+2. Calculate in `BacktestMetricsCalculator.calculate()` in `app/backtesting/metrics.py`
+3. Include in reports in `BacktestReporter`
+4. Add tests in `tests/test_backtesting.py`
+
+### How to Add a New Report
+
+1. Add report method to `BacktestReporter` in `app/backtesting/reporting.py`
+2. Call from `BacktestReporter.generate()`
+3. Add tests
+
 ## Signal Engine
 
 The Signal Engine is the central module for signal generation and management. It evaluates Prediction Results from the Prediction Engine, assessing quality, risk, and value to decide whether to show a prediction to the user.

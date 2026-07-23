@@ -3,6 +3,9 @@
 Reuses existing components without duplicating logic:
     Historical Matches → Provider Layer → AI Engine → Prediction Engine →
     Signal Engine → Backtesting Engine → Metrics → Reports → Calibration Dataset
+
+All dependencies are injected through the constructor.
+PredictionEngine and SignalEngine are managed by the Orchestrator/Runner.
 """
 
 from app.backtesting.cache import BacktestCache
@@ -16,8 +19,6 @@ from app.backtesting.reporting import BacktestReporter
 from app.backtesting.statistics import BacktestStatistics
 from app.backtesting.validator import BacktestValidator
 from app.logging import get_logger
-from app.prediction.engine import PredictionEngine
-from app.signals.engine import SignalEngine
 
 logger = get_logger(__name__)
 
@@ -27,6 +28,7 @@ class BacktestEngine:
 
     All dependencies are injected through the constructor.
     The container builds the full dependency graph externally.
+    PredictionEngine and SignalEngine are held by the Orchestrator/Runner.
 
     Usage:
         engine = container.backtest_engine
@@ -35,8 +37,6 @@ class BacktestEngine:
 
     def __init__(
         self,
-        prediction_engine: PredictionEngine,
-        signal_engine: SignalEngine,
         orchestrator: BacktestOrchestrator,
         evaluator: BacktestEvaluator,
         metrics: BacktestMetricsCalculator,
@@ -47,8 +47,6 @@ class BacktestEngine:
         cache: BacktestCache,
         validator: BacktestValidator | None = None,
     ) -> None:
-        self._prediction_engine = prediction_engine
-        self._signal_engine = signal_engine
         self._orchestrator = orchestrator
         self._evaluator = evaluator
         self._metrics = metrics
@@ -62,25 +60,11 @@ class BacktestEngine:
         logger.info("Backtest Engine initialized via dependency injection")
 
     async def run(self, request: BacktestRequest) -> BacktestResult:
-        """Run a backtest.
-
-        Args:
-            request: Backtest request with scope and parameters.
-
-        Returns:
-            Complete backtest result.
-        """
+        """Run a backtest."""
         return await self._orchestrator.run(request)
 
     async def run_single(self, fixture_id: int) -> BacktestResult:
-        """Run a backtest for a single match.
-
-        Args:
-            fixture_id: Fixture ID to backtest.
-
-        Returns:
-            Backtest result.
-        """
+        """Run a backtest for a single match."""
         request = BacktestRequest(
             scope=BacktestScope.SINGLE_MATCH,
             fixture_id=fixture_id,
