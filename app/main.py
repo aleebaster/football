@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 
 import uvicorn
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.core.dependencies import (
@@ -75,9 +76,46 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
+    # CORS middleware
+    application.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+    # Request logging middleware
+    from app.api.middleware import RequestLoggingMiddleware, SecurityHeadersMiddleware
+
+    application.add_middleware(RequestLoggingMiddleware)
+    application.add_middleware(SecurityHeadersMiddleware)
+
+    # Dashboard root router
     from app.dashboard import router
 
     application.include_router(router)
+
+    # API routers
+    from app.api.routers import (
+        backtesting_router,
+        configuration_router,
+        health_router,
+        matches_router,
+        predictions_router,
+        providers_router,
+        signals_router,
+        statistics_router,
+    )
+
+    application.include_router(health_router, tags=["Health"])
+    application.include_router(matches_router, tags=["Matches"])
+    application.include_router(predictions_router, tags=["Predictions"])
+    application.include_router(signals_router, tags=["Signals"])
+    application.include_router(backtesting_router, tags=["Backtesting"])
+    application.include_router(statistics_router, tags=["Statistics"])
+    application.include_router(providers_router, tags=["Providers"])
+    application.include_router(configuration_router, tags=["Configuration"])
 
     return application
 

@@ -1,6 +1,7 @@
 """Dashboard API router.
 
-Provides health check and status endpoints.
+Provides the root endpoint and health check.
+All API routers are mounted from main.py.
 """
 
 from fastapi import APIRouter
@@ -20,28 +21,4 @@ async def root() -> dict[str, str]:
     return {
         "message": f"Welcome to {settings.project_name}",
         "version": "0.1.0",
-    }
-
-
-@router.get("/health")
-async def health_check() -> dict[str, str]:
-    """Health check endpoint.
-
-    Returns:
-        Health status.
-    """
-    return {"status": "healthy"}
-
-
-@router.get("/status")
-async def status() -> dict[str, str | bool]:
-    """Application status endpoint.
-
-    Returns:
-        Application status information.
-    """
-    return {
-        "status": "running",
-        "debug": settings.debug,
-        "language": settings.language,
     }
