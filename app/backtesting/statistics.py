@@ -4,6 +4,7 @@ Delegates to BacktestMetricsCalculator for core calculations to avoid duplicatio
 """
 
 from collections import defaultdict
+from collections.abc import Callable
 
 from app.backtesting.metrics import BacktestMetricsCalculator
 from app.backtesting.models import EvaluationResult
@@ -21,6 +22,12 @@ class BacktestStatistics:
     def __init__(
         self, metrics_calculator: BacktestMetricsCalculator | None = None
     ) -> None:
+        """Initialize statistics engine.
+
+        Args:
+            metrics_calculator: Shared metrics calculator instance.
+                               Creates a new one if None (default).
+        """
         self._metrics = metrics_calculator or BacktestMetricsCalculator()
 
     def calculate_by_league(
@@ -69,7 +76,6 @@ class BacktestStatistics:
 
         Delegates bucketing to the metrics calculator's calibration buckets.
         """
-        # Use metrics calculator's calibration buckets for consistency
         cal_buckets = self._metrics.calculate_calibration_buckets(results)
 
         stats: dict[str, dict[str, object]] = {}
@@ -88,38 +94,34 @@ class BacktestStatistics:
         self, results: list[EvaluationResult], bucket_size: float = 0.1
     ) -> dict[str, dict[str, object]]:
         """Calculate statistics grouped by risk score buckets."""
-        buckets: dict[str, list[EvaluationResult]] = defaultdict(list)
-        for r in results:
-            bucket_idx = int(r.risk_score / bucket_size)
-            bucket_key = (
-                f"{bucket_idx * bucket_size:.1f}-{(bucket_idx + 1) * bucket_size:.1f}"
-            )
-            buckets[bucket_key].append(r)
 
-        stats: dict[str, dict[str, object]] = {}
-        for bucket_key, bucket_results in buckets.items():
-            total = len(bucket_results)
-            correct = sum(1 for r in bucket_results if r.is_correct)
-            stats[bucket_key] = {
-                "total": total,
-                "correct": correct,
-                "win_rate": correct / total if total > 0 else 0.0,
-            }
-        return stats
+        def _risk_key(r: EvaluationResult) -> str:
+            idx = int(r.risk_score / bucket_size)
+            return f"{idx * bucket_size:.1f}-{(idx + 1) * bucket_size:.1f}"
+
+        return self._group_and_summarize(results, _risk_key)
 
     def calculate_by_predictor(
         self, results: list[EvaluationResult]
     ) -> dict[str, dict[str, object]]:
         """Calculate statistics grouped by model version (predictor)."""
-        by_version: dict[str, list[EvaluationResult]] = defaultdict(list)
+        return self._group_and_summarize(results, lambda r: r.model_version)
+
+    @staticmethod
+    def _group_and_summarize(
+        results: list[EvaluationResult],
+        key_fn: Callable[[EvaluationResult], str],
+    ) -> dict[str, dict[str, object]]:
+        """Group results by key and compute win_rate summary."""
+        grouped: dict[str, list[EvaluationResult]] = defaultdict(list)
         for r in results:
-            by_version[r.model_version].append(r)
+            grouped[key_fn(r)].append(r)
 
         stats: dict[str, dict[str, object]] = {}
-        for version, version_results in by_version.items():
-            total = len(version_results)
-            correct = sum(1 for r in version_results if r.is_correct)
-            stats[version] = {
+        for key, group in grouped.items():
+            total = len(group)
+            correct = sum(1 for r in group if r.is_correct)
+            stats[key] = {
                 "total": total,
                 "correct": correct,
                 "win_rate": correct / total if total > 0 else 0.0,
