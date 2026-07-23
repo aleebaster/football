@@ -22,7 +22,8 @@ logger = get_logger(__name__)
 class BacktestRunner:
     """Runs backtests across different scopes.
 
-    Supports single match, date range, league, season, and all matches.
+    Pipeline: Prediction → Signal → Evaluation
+    Signal Engine results are used to enrich evaluation metadata.
     """
 
     def __init__(
@@ -38,21 +39,13 @@ class BacktestRunner:
         self._evaluator = evaluator
 
     async def run(self, request: BacktestRequest) -> BacktestResult:
-        """Run a backtest based on the request scope.
-
-        Args:
-            request: Backtest request with scope and parameters.
-
-        Returns:
-            BacktestResult with all evaluations.
-        """
+        """Run a backtest based on the request scope."""
         result = BacktestResult(
             request=request,
             status=BacktestStatus.RUNNING,
         )
 
         try:
-            # Load dataset
             matches = await self._dataset.load(request)
             logger.info(f"Running backtest on {len(matches)} matches")
 
@@ -83,11 +76,8 @@ class BacktestRunner:
     async def _evaluate_match(self, match: dict[str, Any]) -> list[EvaluationResult]:
         """Evaluate a single match through the full pipeline.
 
-        Args:
-            match: Historical match data.
-
-        Returns:
-            List of evaluation results for the match.
+        Pipeline: Prediction → Signal → Evaluation
+        Signal results enrich evaluation with signal_id metadata.
         """
         fixture_id = match.get("id", 0)
         home_team_id = match.get("home_team_id", 0)
@@ -105,7 +95,6 @@ class BacktestRunner:
 
         evaluations: list[EvaluationResult] = []
 
-        # Run prediction pipeline
         try:
             prediction_request = PredictionRequest(
                 fixture_id=fixture_id,
@@ -115,20 +104,23 @@ class BacktestRunner:
             )
             prediction = await self._prediction_engine.predict(prediction_request)
 
-            # Run signal pipeline
+            # Run signal pipeline — signals enrich evaluation metadata
+            signal_ids: dict[str, str] = {}
             try:
-                await self._signal_engine.process(prediction)
+                signals = await self._signal_engine.process(prediction)
+                for signal in signals:
+                    # Map market to signal ID for enrichment
+                    signal_ids[signal.market.value] = signal.id
             except Exception as e:
                 logger.debug(f"Signal generation skipped for {fixture_id}: {e}")
 
             # Evaluate each market prediction
             for market_pred in prediction.predictions:
                 if not market_pred.value_bets:
-                    # Use the primary outcome from distribution
                     primary = market_pred.distribution.primary_outcome
                     predicted_outcome = primary[0]
                     predicted_prob = primary[1]
-                    odds = 2.0  # Default odds if no value bet
+                    odds = 2.0
                 else:
                     best_bet = market_pred.value_bets[0]
                     predicted_outcome = best_bet.outcome
@@ -146,6 +138,11 @@ class BacktestRunner:
                     market=market_pred.market,
                     model_version=prediction.model_version,
                 )
+
+                # Enrich with signal ID if available
+                if market_pred.market.value in signal_ids:
+                    eval_result.signal_id = signal_ids[market_pred.market.value]
+
                 evaluations.append(eval_result)
 
         except Exception as e:

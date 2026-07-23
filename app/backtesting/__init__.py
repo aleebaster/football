@@ -5,6 +5,7 @@ Pipeline:
     Signal Engine → Backtesting Engine → Metrics → Reports → Calibration Dataset
 
 The backtesting platform reuses all existing engines without duplicating logic.
+All services are assembled through the Composition Root (app/core/container.py).
 """
 
 from app.backtesting.calibration import BacktestCalibration
@@ -32,7 +33,12 @@ from app.backtesting.models import (
     ComparisonResult,
     EvaluationResult,
     ExportFormat,
+    LeagueStatistics,
     MarketBreakdown,
+    PredictionStatistics,
+    SeasonStatistics,
+    SignalStatistics,
+    TeamStatistics,
 )
 
 __all__ = [
@@ -48,6 +54,11 @@ __all__ = [
     "CalibrationDataset",
     "MarketBreakdown",
     "ExportFormat",
+    "LeagueStatistics",
+    "SeasonStatistics",
+    "TeamStatistics",
+    "PredictionStatistics",
+    "SignalStatistics",
     "BacktestCalibration",
     "BacktestComparison",
     "BacktestExporter",

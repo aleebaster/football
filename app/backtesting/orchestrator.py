@@ -1,6 +1,7 @@
 """Backtesting Orchestrator — coordinates the full backtest pipeline."""
 
 import time
+from datetime import UTC, datetime
 
 from app.backtesting.calibration import BacktestCalibration
 from app.backtesting.evaluator import BacktestEvaluator
@@ -51,14 +52,7 @@ class BacktestOrchestrator:
         self._calibration = calibration
 
     async def run(self, request: BacktestRequest) -> BacktestResult:
-        """Run a full backtest pipeline.
-
-        Args:
-            request: Backtest request.
-
-        Returns:
-            Complete BacktestResult.
-        """
+        """Run a full backtest pipeline."""
         start = time.perf_counter()
 
         # Step 1: Validate
@@ -81,8 +75,6 @@ class BacktestOrchestrator:
         result.id = await self._persistence.save(result)
 
         # Finalize
-        from datetime import UTC, datetime
-
         elapsed = time.perf_counter() - start
         result.duration_seconds = round(elapsed, 3)
         result.completed_at = datetime.now(UTC)

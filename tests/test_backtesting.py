@@ -6,7 +6,7 @@ from app.backtesting.calibration import BacktestCalibration
 from app.backtesting.comparison import BacktestComparison
 from app.backtesting.dataset import BacktestDataset
 from app.backtesting.evaluator import BacktestEvaluator
-from app.backtesting.exceptions import BacktestValidationError
+from app.backtesting.exceptions import BacktestDatasetError, BacktestValidationError
 from app.backtesting.exporter import BacktestExporter
 from app.backtesting.history import BacktestHistory
 from app.backtesting.metrics import BacktestMetricsCalculator
@@ -295,18 +295,25 @@ class TestBacktestMetricsCalculator:
 
 class TestBacktestDataset:
     @pytest.mark.asyncio
-    async def test_load_single_match(self) -> None:
+    async def test_load_raises_without_provider(self) -> None:
+        """Dataset raises BacktestDatasetError when no provider is available."""
         dataset = BacktestDataset()
         req = _make_backtest_request(BacktestScope.SINGLE_MATCH, fixture_id=1000)
-        matches = await dataset.load(req)
-        assert len(matches) > 0
+        with pytest.raises(BacktestDatasetError):
+            await dataset.load(req)
 
     @pytest.mark.asyncio
-    async def test_count(self) -> None:
+    async def test_count_raises_without_provider(self) -> None:
+        """Count raises BacktestDatasetError when no provider is available."""
         dataset = BacktestDataset()
         req = _make_backtest_request(BacktestScope.SINGLE_MATCH, fixture_id=1000)
-        count = await dataset.count(req)
-        assert count >= 1
+        with pytest.raises(BacktestDatasetError):
+            await dataset.count(req)
+
+    def test_dataset_requires_provider(self) -> None:
+        """Dataset requires a provider manager for operations."""
+        dataset = BacktestDataset()
+        assert dataset._provider_manager is None
 
 
 # ===== Persistence Tests =====

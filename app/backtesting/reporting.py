@@ -11,7 +11,11 @@ logger = get_logger(__name__)
 
 
 class BacktestReporter:
-    """Generates summary reports from backtest results."""
+    """Generates summary reports from backtest results.
+
+    Supports: Summary, Per Market, Per Confidence Bucket, Per Risk Bucket,
+    Per Predictor, Per Signal Generator.
+    """
 
     def __init__(
         self, metrics_calculator: BacktestMetricsCalculator | None = None
@@ -19,27 +23,22 @@ class BacktestReporter:
         self._metrics_calculator = metrics_calculator or BacktestMetricsCalculator()
 
     async def generate(self, result: BacktestResult) -> BacktestSummary:
-        """Generate a summary report from backtest results.
-
-        Args:
-            result: Backtest result with evaluations.
-
-        Returns:
-            BacktestSummary with metrics and breakdowns.
-        """
-        # Calculate metrics if not already present
+        """Generate a full summary report from backtest results."""
         if result.metrics.total_predictions == 0 and result.evaluations:
             result.metrics = await self._metrics_calculator.calculate(
                 result.evaluations
             )
 
-        # Calculate market breakdown
         market_breakdown = self._metrics_calculator.calculate_market_breakdown(
             result.evaluations
         )
-
-        # Calculate calibration buckets
         calibration_buckets = self._metrics_calculator.calculate_calibration_buckets(
+            result.evaluations
+        )
+        prediction_statistics = (
+            self._metrics_calculator.calculate_prediction_statistics(result.evaluations)
+        )
+        signal_statistics = self._metrics_calculator.calculate_signal_statistics(
             result.evaluations
         )
 
@@ -49,6 +48,8 @@ class BacktestReporter:
             metrics=result.metrics,
             market_breakdown=market_breakdown,
             calibration_buckets=calibration_buckets,
+            prediction_statistics=prediction_statistics,
+            signal_statistics=signal_statistics,
             total_evaluations=len(result.evaluations),
             started_at=result.started_at,
             completed_at=result.completed_at,
@@ -63,14 +64,7 @@ class BacktestReporter:
         return summary
 
     def format_text_report(self, summary: BacktestSummary) -> str:
-        """Format a summary as a readable text report.
-
-        Args:
-            summary: Backtest summary.
-
-        Returns:
-            Formatted text report.
-        """
+        """Format a summary as a readable text report."""
         m = summary.metrics
         lines = [
             "=" * 60,
@@ -91,9 +85,6 @@ class BacktestReporter:
             "",
             "--- STATISTICAL METRICS ---",
             f"Accuracy: {m.accuracy:.2%}",
-            f"Precision: {m.precision:.2%}",
-            f"Recall: {m.recall:.2%}",
-            f"F1 Score: {m.f1_score:.2%}",
             f"Brier Score: {m.brier_score:.4f}",
             f"Log Loss: {m.log_loss:.4f}",
             f"Calibration Error: {m.calibration_error:.4f}",
@@ -106,6 +97,24 @@ class BacktestReporter:
                 lines.append(
                     f"  {mb.market}: {mb.correct}/{mb.total} "
                     f"({mb.win_rate:.2%}), ROI={mb.roi:.2%}"
+                )
+            lines.append("")
+
+        if summary.prediction_statistics:
+            lines.append("--- PREDICTION STATISTICS ---")
+            for ps in summary.prediction_statistics:
+                lines.append(
+                    f"  {ps.market}: {ps.total_predictions} predictions, "
+                    f"Brier={ps.brier_score:.4f}"
+                )
+            lines.append("")
+
+        if summary.signal_statistics:
+            lines.append("--- SIGNAL STATISTICS ---")
+            for ss in summary.signal_statistics:
+                lines.append(
+                    f"  {ss.signal_type}: {ss.total_signals} signals, "
+                    f"win_rate={ss.win_rate:.2%}"
                 )
             lines.append("")
 
