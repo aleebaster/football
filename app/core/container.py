@@ -155,52 +155,45 @@ class Container:
     @property
     def backtest_engine(self) -> BacktestEngine:
         if self._backtest_engine is None:
+            from app.backtesting.calibration import BacktestCalibration
             from app.backtesting.engine import BacktestEngine
+            from app.backtesting.evaluator import BacktestEvaluator
+            from app.backtesting.metrics import BacktestMetricsCalculator
+            from app.backtesting.persistence import BacktestPersistence
+            from app.backtesting.reporting import BacktestReporter
+            from app.backtesting.statistics import BacktestStatistics
 
-            self._backtest_engine = self._build_backtest_engine(BacktestEngine)
+            evaluator = BacktestEvaluator()
+            metrics = BacktestMetricsCalculator()
+            persistence = BacktestPersistence()
+            calibration = BacktestCalibration()
+            statistics = BacktestStatistics(metrics_calculator=metrics)
+            reporter = BacktestReporter(metrics)
+            runner = self._build_backtest_runner(evaluator)
+            orchestrator = self._build_backtest_orchestrator(
+                runner=runner,
+                evaluator=evaluator,
+                metrics_calculator=metrics,
+                reporter=reporter,
+                persistence=persistence,
+                calibration=calibration,
+            )
+
+            from app.backtesting.cache import BacktestCache
+
+            cache = BacktestCache(self.cache_manager)
+
+            self._backtest_engine = BacktestEngine(
+                orchestrator=orchestrator,
+                evaluator=evaluator,
+                metrics=metrics,
+                reporter=reporter,
+                persistence=persistence,
+                calibration=calibration,
+                statistics=statistics,
+                cache=cache,
+            )
         return self._backtest_engine
-
-    def _build_backtest_engine(
-        self, engine_cls: type[BacktestEngine]
-    ) -> BacktestEngine:
-        """Build the backtesting engine with all dependencies."""
-        from app.backtesting.calibration import BacktestCalibration
-        from app.backtesting.evaluator import BacktestEvaluator
-        from app.backtesting.metrics import BacktestMetricsCalculator
-        from app.backtesting.persistence import BacktestPersistence
-        from app.backtesting.reporting import BacktestReporter
-        from app.backtesting.statistics import BacktestStatistics
-
-        evaluator = BacktestEvaluator()
-        metrics = BacktestMetricsCalculator()
-        persistence = BacktestPersistence()
-        calibration = BacktestCalibration()
-        statistics = BacktestStatistics(metrics_calculator=metrics)
-        reporter = BacktestReporter(metrics)
-        runner = self._build_backtest_runner(evaluator)
-        orchestrator = self._build_backtest_orchestrator(
-            runner=runner,
-            evaluator=evaluator,
-            metrics_calculator=metrics,
-            reporter=reporter,
-            persistence=persistence,
-            calibration=calibration,
-        )
-
-        from app.backtesting.cache import BacktestCache
-
-        cache = BacktestCache(self.cache_manager)
-
-        return engine_cls(
-            orchestrator=orchestrator,
-            evaluator=evaluator,
-            metrics=metrics,
-            reporter=reporter,
-            persistence=persistence,
-            calibration=calibration,
-            statistics=statistics,
-            cache=cache,
-        )
 
     def _build_backtest_runner(self, evaluator: BacktestEvaluator) -> BacktestRunner:
         """Build the backtest runner."""
