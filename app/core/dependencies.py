@@ -123,13 +123,40 @@ def get_prediction_engine() -> Any:
 
 
 def get_signal_engine() -> Any:
-    """Get or create the global Signal Engine."""
+    """Get or create the global Signal Engine.
+
+    Creates all Signal Engine dependencies through the DI system.
+    Returns:
+        SignalEngine instance.
+    """
     global _signal_engine
     if _signal_engine is None:
+        from app.signals.cooldown import CooldownManager
+        from app.signals.deduplication import DeduplicationManager
         from app.signals.engine import SignalEngine
+        from app.signals.filtering import SignalFilter
+        from app.signals.history import SignalHistoryStore
+        from app.signals.metrics import MetricsCollector
+        from app.signals.notifications import NotificationEngine
+        from app.signals.persistence import SignalPersistence
+        from app.signals.ranking import SignalRanker
+        from app.signals.registry import SignalGeneratorRegistry
+        from app.signals.scoring import SignalScorer
+        from app.signals.validator import SignalValidator
 
         _signal_engine = SignalEngine(
             cache_manager=get_cache_manager(),
+            registry=SignalGeneratorRegistry(),
+            validator=SignalValidator(),
+            signal_filter=SignalFilter(),
+            deduplication=DeduplicationManager(),
+            cooldown=CooldownManager(),
+            scorer=SignalScorer(),
+            ranker=SignalRanker(),
+            notifications=NotificationEngine(),
+            history=SignalHistoryStore(),
+            persistence=SignalPersistence(),
+            metrics=MetricsCollector(),
         )
     return _signal_engine
 

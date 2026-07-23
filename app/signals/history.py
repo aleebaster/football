@@ -30,8 +30,11 @@ class SignalHistoryStore:
         record = SignalHistory(
             id=self._next_id,
             signal_id=signal.id,
+            prediction_id=signal.prediction_id,
             fixture_id=signal.fixture_id,
             signal=signal,
+            ai_version=signal.model_version,
+            prediction_engine_version=signal.signal_version,
         )
         self._next_id += 1
 

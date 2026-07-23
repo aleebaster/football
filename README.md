@@ -199,6 +199,143 @@ registry = get_provider_registry()
 
 **Important**: Never create `ProviderManager` or provider instances directly. Always use the DI system.
 
+## Signal Engine
+
+The Signal Engine is the central module for signal generation and management. It evaluates Prediction Results from the Prediction Engine, assessing quality, risk, and value to decide whether to show a prediction to the user.
+
+### Signal Pipeline
+
+```
+PredictionResult
+→ Validation
+→ Signal Generation
+→ Filtering
+→ Deduplication
+→ Cooldown Check
+→ Scoring
+→ Ranking (multi-factor)
+→ User Preferences
+→ Notification Decision
+→ Signal
+```
+
+### Core Components
+
+| Component | Purpose |
+|-----------|---------|
+| `SignalEngine` | Main entry point, accepts dependencies via DI |
+| `SignalOrchestrator` | Coordinates the full pipeline |
+| `SignalScorer` | Calculates comprehensive signal quality scores |
+| `SignalRanker` | Multi-factor ranking (EV, confidence, risk, etc.) |
+| `SignalFilter` | Filters signals by quality criteria |
+| `DeduplicationManager` | Prevents duplicate signals |
+| `CooldownManager` | Prevents spam and cyclic updates |
+| `NotificationEngine` | Decides when to notify users |
+| `SignalHistoryStore` | Tracks signal history for backtesting |
+| `ROIEngine` | Calculates ROI and yield statistics |
+| `PerformanceEngine` | Tracks performance by market type |
+
+### Signal Generators
+
+| Generator | Market | Description |
+|-----------|--------|-------------|
+| `WinnerSignalGenerator` | MATCH_WINNER | Home/Draw/Away signals |
+| `OverUnderSignalGenerator` | OVER_UNDER_25 | Over/Under goals signals |
+| `BTTSSignalGenerator` | BTTS | Both Teams To Score signals |
+| `HandicapSignalGenerator` | ASIAN_HANDICAP | Asian handicap signals |
+| `ValueSignalGenerator` | All markets | Value bet detection |
+| `LiveSignalGenerator` | All markets | Live match signals |
+
+### Signal Score
+
+Each signal receives a comprehensive score:
+- **Overall**: Weighted composite score (0-1)
+- **Confidence**: Prediction confidence (0-1)
+- **Expected Value**: Mathematical edge (-1 to 10)
+- **Risk**: Risk assessment (0-1)
+- **Data Quality**: Input data completeness (0-1)
+- **Provider Quality**: Data source reliability (0-1)
+- **Prediction Stability**: Model consistency (0-1)
+- **Historical Accuracy**: Past performance (0-1)
+- **Market Quality**: Market liquidity/reliability (0-1)
+- **Signal Freshness**: Time decay factor (0-1)
+
+### Signal Ranking
+
+Signals are ranked using a multi-factor algorithm:
+- Overall Score: 30%
+- Confidence: 20%
+- Expected Value: 25%
+- Risk (inverted): 10%
+- Historical Accuracy: 10%
+- Provider Quality: 5%
+
+### Signal Filtering
+
+Signals are filtered out if:
+- Confidence below threshold (default: 0.3)
+- Risk above threshold (default: 0.8)
+- Data too old (>1 hour)
+- No explanation provided
+- Signal is inactive
+
+### Value Categories
+
+| Category | EV Range | Description |
+|----------|----------|-------------|
+| STRONG_VALUE | ≥ 0.08 | High confidence value bet |
+| VALUE | ≥ 0.03 | Moderate value |
+| NEUTRAL | 0 to 0.03 | No clear edge |
+| NEGATIVE_EV | < 0 | Not recommended |
+
+### How to Add a New Signal Generator
+
+1. Create a generator in `app/signals/generators/`:
+
+```python
+from app.signals.interfaces import BaseSignalGenerator
+from app.prediction.models import PredictionResult
+from app.signals.models import Signal
+
+class MySignalGenerator(BaseSignalGenerator):
+    async def generate(self, prediction: PredictionResult) -> list[Signal]:
+        # Generate signals from prediction
+        return [Signal(...)]
+```
+
+2. Register in `app/signals/engine.py`:
+
+```python
+from app.signals.generators.my_generator import MySignalGenerator
+
+self._registry.register(MySignalGenerator(), PredictionMarket.MY_MARKET)
+```
+
+3. Add tests in `tests/test_signals.py`.
+
+### Dependency Injection
+
+The Signal Engine integrates with the DI system:
+
+```python
+from app.core.dependencies import get_signal_engine
+
+engine = get_signal_engine()  # Singleton instance
+signals = await engine.process(prediction)
+```
+
+All components can be injected via the `SignalEngine` constructor:
+
+```python
+engine = SignalEngine(
+    cache_manager=cache_manager,
+    registry=custom_registry,
+    validator=custom_validator,
+    signal_filter=custom_filter,
+    # ... other dependencies
+)
+```
+
 ## Development
 
 ### Setup

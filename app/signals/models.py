@@ -133,6 +133,7 @@ class SignalHistory(BaseModel):
 
     id: int | None = None
     signal_id: str
+    prediction_id: str = ""
     fixture_id: int
     signal: Signal
     actual_outcome: str | None = None
@@ -140,7 +141,11 @@ class SignalHistory(BaseModel):
     roi: float = Field(default=0.0)
     edge: float = Field(default=0.0)
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     resolved_at: datetime | None = None
+    cancelled_at: datetime | None = None
+    ai_version: str = "1.0.0"
+    prediction_engine_version: str = "1.0.0"
 
 
 class SignalNotification(BaseModel):
@@ -201,7 +206,7 @@ class ROIStatistics(BaseModel):
     roi: float = Field(default=0.0)
     yield_pct: float = Field(default=0.0)
     win_rate: float = Field(default=0.0, ge=0, le=1)
-    average_odds: float = Field(default=1.0, ge=0)
+    average_odds: float = Field(default=1.0, gt=0)
     average_confidence: float = Field(default=0.0, ge=0, le=1)
     average_risk: float = Field(default=0.0, ge=0, le=1)
     average_edge: float = Field(default=0.0)

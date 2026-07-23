@@ -38,24 +38,39 @@ class SignalEngine:
         signals = await engine.process(prediction_result)
     """
 
-    def __init__(self, cache_manager: CacheManager) -> None:
+    def __init__(
+        self,
+        cache_manager: CacheManager,
+        registry: SignalGeneratorRegistry | None = None,
+        validator: SignalValidator | None = None,
+        signal_filter: SignalFilter | None = None,
+        deduplication: DeduplicationManager | None = None,
+        cooldown: CooldownManager | None = None,
+        scorer: SignalScorer | None = None,
+        ranker: SignalRanker | None = None,
+        notifications: NotificationEngine | None = None,
+        history: SignalHistoryStore | None = None,
+        persistence: SignalPersistence | None = None,
+        metrics: MetricsCollector | None = None,
+    ) -> None:
         # Initialize cache
         self._cache = SignalCache(cache_manager)
 
-        # Initialize core components
-        self._registry = SignalGeneratorRegistry()
-        self._register_generators()
+        # Use provided dependencies or create defaults
+        self._registry = registry or SignalGeneratorRegistry()
+        if not registry:
+            self._register_generators()
 
-        self._validator = SignalValidator()
-        self._filter = SignalFilter()
-        self._dedup = DeduplicationManager()
-        self._cooldown = CooldownManager()
-        self._scorer = SignalScorer()
-        self._ranker = SignalRanker()
-        self._notifications = NotificationEngine()
-        self._history = SignalHistoryStore()
-        self._persistence = SignalPersistence()
-        self._metrics = MetricsCollector()
+        self._validator = validator or SignalValidator()
+        self._filter = signal_filter or SignalFilter()
+        self._dedup = deduplication or DeduplicationManager()
+        self._cooldown = cooldown or CooldownManager()
+        self._scorer = scorer or SignalScorer()
+        self._ranker = ranker or SignalRanker()
+        self._notifications = notifications or NotificationEngine()
+        self._history = history or SignalHistoryStore()
+        self._persistence = persistence or SignalPersistence()
+        self._metrics = metrics or MetricsCollector()
 
         # Initialize user management
         self._preferences_manager = PreferencesManager()

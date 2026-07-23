@@ -41,8 +41,13 @@ class SignalOrchestrator:
         → Cooldown Check
         → Scoring
         → Ranking
+        → Risk Filter
+        → User Preferences
         → Notification Decision
         → Signal
+
+    Note: Ranking is performed after scoring to allow multi-factor ranking
+    that considers both score components and risk metrics.
     """
 
     def __init__(
@@ -79,6 +84,25 @@ class SignalOrchestrator:
         preferences: UserPreferences | None = None,
     ) -> list[Signal]:
         """Process a prediction through the full signal pipeline.
+
+        Pipeline order:
+            1. Validate prediction
+            2. Check cache
+            3. Generate signals
+            4. Filter signals
+            5. Deduplicate
+            6. Cooldown check
+            7. Score signals
+            8. Rank signals (multi-factor)
+            9. Apply user preferences
+            10. Make notification decisions
+            11. Store in history & persistence
+            12. Cache results
+
+        Note: The spec calls for Ranking before Scoring, but we deviate here
+        because multi-factor ranking requires scored signals (overall score,
+        confidence, expected value, etc.) to compute composite rank scores.
+        Scoring must precede Ranking to provide the necessary inputs.
 
         Args:
             prediction: Prediction result from Prediction Engine.
@@ -138,18 +162,21 @@ class SignalOrchestrator:
         for signal in ready:
             signal.score = self._scorer.calculate_score(signal, prediction)
             signal.value_category = self._scorer.categorize_value(signal)
-            self._dedup.register(signal)
 
-        # Step 8: Rank signals
+        # Step 8: Rank signals (multi-factor scoring)
         ranked = self._ranker.rank(ready)
 
-        # Step 9: Apply user preferences
+        # Step 9: Register deduplication state after scoring/ranking
+        for signal in ranked:
+            self._dedup.register(signal)
+
+        # Step 10: Apply user preferences
         if preferences:
             ranked = [
                 s for s in ranked if self._filter.apply_user_preferences(s, preferences)
             ]
 
-        # Step 10: Make notification decisions
+        # Step 11: Make notification decisions
         for signal in ranked:
             notification = self._notifications.should_notify(signal, preferences)
             if notification.should_notify:
@@ -163,7 +190,7 @@ class SignalOrchestrator:
         self._metrics.record_processing_time(elapsed)
         self._metrics.record_generated(len(ranked))
 
-        # Step 11: Cache results
+        # Step 12: Cache results
         if self._cache and ranked:
             await self._cache.set(
                 prediction.fixture_id,

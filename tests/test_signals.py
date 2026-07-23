@@ -1,5 +1,7 @@
 """Tests for Signal Engine."""
 
+import uuid
+
 import pytest
 
 from app.cache.base import CacheManager
@@ -148,9 +150,9 @@ def _make_signal(
     risk_score: float = 0.4,
     market: PredictionMarket = PredictionMarket.MATCH_WINNER,
 ) -> Signal:
-    """Create a test signal."""
+    """Create a test signal with a unique ID."""
     return Signal(
-        id="sig_test123",
+        id=f"sig_{uuid.uuid4().hex[:8]}",
         fixture_id=fixture_id,
         home_team_id=1,
         away_team_id=2,
@@ -175,7 +177,7 @@ def _make_signal(
 class TestSignalModels:
     def test_signal_creation(self) -> None:
         signal = _make_signal()
-        assert signal.id == "sig_test123"
+        assert signal.id.startswith("sig_")
         assert signal.fixture_id == 1000
         assert signal.confidence == 0.7
         assert signal.status == SignalStatus.ACTIVE
@@ -469,6 +471,70 @@ class TestDeduplicationManager:
         signals = [_make_signal(), _make_signal(), _make_signal()]
         unique = dedup.filter_duplicates(signals)
         assert len(unique) == 1
+
+    def test_different_ids_same_content_are_duplicates(self) -> None:
+        """Test that signals with different IDs but same content are deduplicated."""
+        dedup = DeduplicationManager()
+        signal1 = Signal(
+            id="sig_1",
+            fixture_id=1000,
+            home_team_id=1,
+            away_team_id=2,
+            market=PredictionMarket.MATCH_WINNER,
+            outcome="home",
+            probability=0.55,
+            confidence=0.7,
+            odds=2.2,
+            summary="Test",
+            key_factors=["F1"],
+        )
+        signal2 = Signal(
+            id="sig_2",
+            fixture_id=1000,
+            home_team_id=1,
+            away_team_id=2,
+            market=PredictionMarket.MATCH_WINNER,
+            outcome="home",
+            probability=0.55,
+            confidence=0.7,
+            odds=2.2,
+            summary="Test",
+            key_factors=["F1"],
+        )
+        # Different IDs but same key -> duplicates
+        unique = dedup.filter_duplicates([signal1, signal2])
+        assert len(unique) == 1
+
+    def test_different_content_not_duplicates(self) -> None:
+        """Test that signals with different content are not deduplicated."""
+        dedup = DeduplicationManager()
+        signal1 = Signal(
+            id="sig_1",
+            fixture_id=1000,
+            home_team_id=1,
+            away_team_id=2,
+            market=PredictionMarket.MATCH_WINNER,
+            outcome="home",
+            confidence=0.7,
+            odds=2.2,
+            summary="Test",
+            key_factors=["F1"],
+        )
+        signal2 = Signal(
+            id="sig_2",
+            fixture_id=1000,
+            home_team_id=1,
+            away_team_id=2,
+            market=PredictionMarket.OVER_UNDER_25,
+            outcome="over",
+            confidence=0.7,
+            odds=2.2,
+            summary="Test",
+            key_factors=["F1"],
+        )
+        # Different market -> not duplicates
+        unique = dedup.filter_duplicates([signal1, signal2])
+        assert len(unique) == 2
 
 
 # ===== Signal History Tests =====
