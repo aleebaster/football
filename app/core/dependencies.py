@@ -22,6 +22,7 @@ _provider_registry: ProviderRegistry | None = None
 _provider_manager: ProviderManager | None = None
 _ai_engine: Any = None
 _prediction_engine: Any = None
+_signal_engine: Any = None
 
 
 def get_cache_manager() -> CacheManager:
@@ -119,6 +120,18 @@ def get_prediction_engine() -> Any:
             cache_manager=get_cache_manager(),
         )
     return _prediction_engine
+
+
+def get_signal_engine() -> Any:
+    """Get or create the global Signal Engine."""
+    global _signal_engine
+    if _signal_engine is None:
+        from app.signals.engine import SignalEngine
+
+        _signal_engine = SignalEngine(
+            cache_manager=get_cache_manager(),
+        )
+    return _signal_engine
 
 
 def register_default_providers() -> None:
