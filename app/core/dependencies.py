@@ -1,6 +1,7 @@
-"""Dependency injection functions for FastAPI.
+"""Composition Root — central dependency injection container.
 
-Provides injectable dependencies for services and utilities.
+All services are assembled here and shared across the application.
+This module is the single source of truth for dependency creation.
 """
 
 from collections.abc import AsyncGenerator
@@ -16,13 +17,14 @@ from app.providers.cache import ProviderCache
 from app.providers.manager import ProviderManager
 from app.providers.registry import ProviderRegistry
 
-# Global instances
+# Global instances — lazy singletons
 _cache: CacheManager | None = None
 _provider_registry: ProviderRegistry | None = None
 _provider_manager: ProviderManager | None = None
 _ai_engine: Any = None
 _prediction_engine: Any = None
 _signal_engine: Any = None
+_backtesting_engine: Any = None
 
 
 def get_cache_manager() -> CacheManager:
@@ -159,6 +161,26 @@ def get_signal_engine() -> Any:
             metrics=MetricsCollector(),
         )
     return _signal_engine
+
+
+def get_backtesting_engine() -> Any:
+    """Get or create the global Backtesting Engine.
+
+    Creates all Backtesting dependencies through the Composition Root.
+    Returns:
+        BacktestingEngine instance.
+    """
+    global _backtesting_engine
+    if _backtesting_engine is None:
+        from app.backtesting.engine import BacktestEngine
+
+        _backtesting_engine = BacktestEngine(
+            prediction_engine=get_prediction_engine(),
+            signal_engine=get_signal_engine(),
+            cache_manager=get_cache_manager(),
+            provider_manager=get_provider_manager(),
+        )
+    return _backtesting_engine
 
 
 def register_default_providers() -> None:
