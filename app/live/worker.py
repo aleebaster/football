@@ -9,7 +9,11 @@ from __future__ import annotations
 import time
 import uuid
 from collections.abc import Callable, Coroutine
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from app.prediction.engine import PredictionEngine
+    from app.signals.engine import SignalEngine
 
 from app.live.events import EventFactory, LiveEvent
 from app.live.interfaces import WorkerInterface
@@ -41,10 +45,14 @@ class LiveWorker(WorkerInterface):
         worker_id: str | None = None,
         provider_manager: ProviderManager | None = None,
         state_registry: StateRegistry | None = None,
+        prediction_engine: PredictionEngine | None = None,
+        signal_engine: SignalEngine | None = None,
     ) -> None:
         self._worker_id = worker_id or f"worker_{uuid.uuid4().hex[:8]}"
         self._provider_manager = provider_manager
         self._state_registry = state_registry
+        self._prediction_engine = prediction_engine
+        self._signal_engine = signal_engine
         self._busy = False
         self._current_fixture: int | None = None
         self._processed_count = 0
@@ -195,9 +203,14 @@ class LiveWorker(WorkerInterface):
     ) -> list[LiveEvent]:
         """Run AI → Prediction → Signal pipeline and collect events."""
         events: list[LiveEvent] = []
-        from app.core.container import get_container
 
-        container = get_container()
+        # Use injected engines (DI, not service locator)
+        prediction_engine = self._prediction_engine
+        signal_engine = self._signal_engine
+
+        if prediction_engine is None or signal_engine is None:
+            logger.debug(f"Engines not available for fixture {match.fixture_id}")
+            return events
 
         # Run Prediction
         try:
@@ -207,7 +220,7 @@ class LiveWorker(WorkerInterface):
                 away_team_id=match.away_team_id,
                 force_refresh=True,
             )
-            prediction = await container.prediction_engine.predict(request)
+            prediction = await prediction_engine.predict(request)
 
             events.append(
                 EventFactory.prediction_updated(
@@ -219,7 +232,7 @@ class LiveWorker(WorkerInterface):
 
             # Run Signal Engine
             try:
-                signals = await container.signal_engine.process(prediction)
+                signals = await signal_engine.process(prediction)
                 for signal in signals:
                     events.append(
                         EventFactory.signal_created(

@@ -173,7 +173,7 @@ class TestMatchQueue:
         await q.enqueue(match)
         await q.mark_processed(1)
         await q.enqueue(match)  # Should be skipped
-        assert q.size == 1  # Only the first one
+        assert q.size == 1
 
     @pytest.mark.asyncio
     async def test_clear(self) -> None:
@@ -191,7 +191,7 @@ class TestMatchQueue:
         result = await q.peek()
         assert result is not None
         assert result.fixture_id == 42
-        assert q.size == 1  # peek doesn't remove
+        assert q.size == 1
 
     def test_stats(self) -> None:
         q = MatchQueue()
@@ -246,6 +246,16 @@ class TestStateRegistry:
         assert worker is not None
         assert worker.status == WorkerStatus.PROCESSING
         assert worker.current_fixture_id == 100
+
+    @pytest.mark.asyncio
+    async def test_get_all_workers(self) -> None:
+        reg = StateRegistry()
+        await reg.register_worker("w1")
+        await reg.register_worker("w2")
+        workers = await reg.get_all_workers()
+        assert len(workers) == 2
+        assert "w1" in workers
+        assert "w2" in workers
 
     def test_heartbeat(self) -> None:
         reg = StateRegistry()
@@ -389,6 +399,102 @@ class TestLiveMetricsCollector:
         assert metrics.provider_latency_ms == 30.0
 
 
+# ===== Recovery Tests =====
+
+
+class TestRecovery:
+    def test_retry_policy(self) -> None:
+        from app.live.recovery import RetryPolicy
+
+        policy = RetryPolicy(max_retries=3, base_delay=1.0)
+        assert policy.should_retry()
+        assert policy.attempt == 0
+        policy.record_attempt()
+        assert policy.attempt == 1
+        assert policy.get_delay() == 2.0
+        policy.record_attempt()
+        assert policy.get_delay() == 4.0
+        policy.record_attempt()
+        assert not policy.should_retry()
+
+    def test_retry_policy_reset(self) -> None:
+        from app.live.recovery import RetryPolicy
+
+        policy = RetryPolicy(max_retries=2)
+        policy.record_attempt()
+        policy.record_attempt()
+        assert not policy.should_retry()
+        policy.reset()
+        assert policy.should_retry()
+
+    @pytest.mark.asyncio
+    async def test_worker_recovery_success(self) -> None:
+        from app.live.recovery import WorkerRecovery
+
+        recovery = WorkerRecovery()
+        restarted = False
+
+        async def restart():
+            nonlocal restarted
+            restarted = True
+
+        result = await recovery.recover("w1", restart)
+        assert result is True
+        assert restarted is True
+
+    @pytest.mark.asyncio
+    async def test_worker_recovery_failure(self) -> None:
+        from app.live.recovery import RetryPolicy, WorkerRecovery
+
+        policy = RetryPolicy(max_retries=1, base_delay=0.01)
+        recovery = WorkerRecovery(retry_policy=policy)
+
+        async def fail():
+            raise RuntimeError("failed")
+
+        result = await recovery.recover("w1", fail)
+        assert result is False
+
+    @pytest.mark.asyncio
+    async def test_provider_recovery_success(self) -> None:
+        from app.live.recovery import ProviderFailureRecovery
+
+        recovery = ProviderFailureRecovery()
+
+        async def recover():
+            pass
+
+        result = await recovery.recover("mock", recover)
+        assert result is True
+
+    @pytest.mark.asyncio
+    async def test_queue_recovery(self) -> None:
+        from app.live.recovery import QueueRecovery
+
+        recovery = QueueRecovery()
+        q = MatchQueue()
+        recovered = await recovery.recover_stuck_queue(q)
+        assert recovered >= 0
+
+    @pytest.mark.asyncio
+    async def test_queue_validation(self) -> None:
+        from app.live.recovery import QueueRecovery
+
+        recovery = QueueRecovery()
+        q = MatchQueue()
+        valid = await recovery.validate_queue(q)
+        assert valid is True
+
+    def test_scheduler_recovery_degraded(self) -> None:
+        from app.live.recovery import SchedulerRecovery
+
+        recovery = SchedulerRecovery()
+        assert not recovery.is_degraded
+        for _ in range(5):
+            recovery.record_failure()
+        assert recovery.is_degraded
+
+
 # ===== Exception Tests =====
 
 
@@ -480,3 +586,120 @@ class TestLiveMapper:
         dto = Mapper.to_live_status_dto(status)
         assert dto.running is True
         assert dto.active_matches == 3
+
+
+# ===== Integration Test =====
+
+
+class TestLiveIntegration:
+    @pytest.mark.asyncio
+    async def test_full_pipeline(self) -> None:
+        """Integration test: State → Queue → Publisher → Events."""
+        # Setup components
+        state = StateRegistry()
+        queue = MatchQueue()
+        publisher = EventPublisher()
+        dispatcher = EventDispatcher(publisher)
+
+        # Track published events
+        published: list[LiveEvent] = []
+
+        async def track_events(event: LiveEvent) -> None:
+            published.append(event)
+
+        publisher.register(track_events)
+
+        # Store a match in state
+        match = LiveMatch(
+            fixture_id=100,
+            home_team="Arsenal",
+            away_team="Chelsea",
+            state=MatchState.LIVE,
+        )
+        await state.store_match(match)
+
+        # Enqueue the match
+        await queue.enqueue_priority(match)
+        assert queue.size == 1
+
+        # Dequeue and process
+        dequeued = await queue.dequeue()
+        assert dequeued is not None
+        assert dequeued.fixture_id == 100
+
+        # Create and publish events
+        start_event = EventFactory.match_started(match)
+        pred_event = EventFactory.prediction_updated(fixture_id=100, confidence=0.85)
+        signal_event = EventFactory.signal_created(
+            fixture_id=100, signal_id="sig_1", market="match_winner", outcome="home"
+        )
+        finish_event = EventFactory.match_finished(match)
+
+        await dispatcher.dispatch(start_event)
+        await dispatcher.dispatch(pred_event)
+        await dispatcher.dispatch(signal_event)
+        await dispatcher.dispatch(finish_event)
+
+        # Verify events were published
+        assert len(published) == 4
+        assert published[0].event_type == "match_started"
+        assert published[1].event_type == "prediction_updated"
+        assert published[2].event_type == "signal_created"
+        assert published[3].event_type == "match_finished"
+
+        # Verify state
+        state_result = await state.get_match_state(100)
+        assert state_result == MatchState.LIVE
+
+        # Verify queue is empty
+        assert queue.is_empty
+
+    @pytest.mark.asyncio
+    async def test_telegram_adapter(self) -> None:
+        """Integration test: Live Event → Telegram Adapter."""
+        from app.telegram.adapters.live import LiveTelegramAdapter
+
+        sent_messages: list[str] = []
+
+        async def mock_send(message: str) -> bool:
+            sent_messages.append(message)
+            return True
+
+        adapter = LiveTelegramAdapter(send_func=mock_send)
+
+        # Test goal event
+        goal_event = EventFactory.goal(
+            fixture_id=100,
+            team="Arsenal",
+            player="Saka",
+            minute=65,
+            score_home=1,
+            score_away=0,
+        )
+        await adapter.handle_event(goal_event)
+        assert len(sent_messages) == 1
+        assert "GOAL" in sent_messages[0]
+        assert "Saka" in sent_messages[0]
+
+        # Test match finished event
+        match = LiveMatch(
+            fixture_id=100,
+            home_team="Arsenal",
+            away_team="Chelsea",
+            home_score=2,
+            away_score=1,
+        )
+        finish_event = EventFactory.match_finished(match)
+        await adapter.handle_event(finish_event)
+        assert len(sent_messages) == 2
+        assert "Finished" in sent_messages[1]
+
+        # Test disabled adapter
+        adapter.disable()
+        signal_event = EventFactory.signal_created(fixture_id=100, signal_id="sig_1")
+        await adapter.handle_event(signal_event)
+        assert len(sent_messages) == 2  # No new message
+
+        # Verify stats
+        assert adapter.events_handled == 2
+        assert adapter.is_enabled is False

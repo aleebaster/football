@@ -82,3 +82,17 @@ class LiveStatusDTO(BaseModel):
     queue_size: int = 0
     events_published: int = 0
     uptime_seconds: float = 0.0
+
+
+class LiveSignalDTO(BaseModel):
+    """Live signal data for API response."""
+
+    signal_id: str
+    fixture_id: int
+    market: str = ""
+    outcome: str = ""
+    confidence: float = 0.0
+    score: float = 0.0
+    value_category: str = "neutral"
+    status: str = "active"
+    correlation_id: str | None = None

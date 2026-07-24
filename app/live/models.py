@@ -27,21 +27,6 @@ class MatchState(StrEnum):
     INTERRUPTED = "interrupted"
 
 
-class EventType(StrEnum):
-    """Types of live events."""
-
-    MATCH_STARTED = "match_started"
-    PREDICTION_UPDATED = "prediction_updated"
-    SIGNAL_CREATED = "signal_created"
-    SIGNAL_UPDATED = "signal_updated"
-    GOAL = "goal"
-    ODDS_CHANGED = "odds_changed"
-    MATCH_FINISHED = "match_finished"
-    HEARTBEAT = "heartbeat"
-    STATE_CHANGED = "state_changed"
-    ERROR = "error"
-
-
 class WorkerStatus(StrEnum):
     """Worker status."""
 
@@ -68,66 +53,6 @@ class LiveMatch(BaseModel):
     away_score: int | None = None
     last_updated: datetime = Field(default_factory=datetime.utcnow)
     extra_data: dict[str, Any] = Field(default_factory=dict)
-
-
-class LiveEvent(BaseModel):
-    """An event emitted by the Live Engine."""
-
-    event_id: str = ""
-    event_type: EventType
-    fixture_id: int
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
-    data: dict[str, Any] = Field(default_factory=dict)
-    correlation_id: str | None = None
-    worker_id: str | None = None
-
-
-class MatchStartedEvent(LiveEvent):
-    """Emitted when a match transitions to LIVE."""
-
-    event_type: EventType = EventType.MATCH_STARTED
-
-
-class PredictionUpdatedEvent(LiveEvent):
-    """Emitted when predictions are updated for a live match."""
-
-    event_type: EventType = EventType.PREDICTION_UPDATED
-
-
-class SignalCreatedEvent(LiveEvent):
-    """Emitted when a new signal is created for a live match."""
-
-    event_type: EventType = EventType.SIGNAL_CREATED
-
-
-class SignalUpdatedEvent(LiveEvent):
-    """Emitted when a signal is updated."""
-
-    event_type: EventType = EventType.SIGNAL_UPDATED
-
-
-class GoalEvent(LiveEvent):
-    """Emitted when a goal is scored."""
-
-    event_type: EventType = EventType.GOAL
-
-
-class OddsChangedEvent(LiveEvent):
-    """Emitted when odds change significantly."""
-
-    event_type: EventType = EventType.ODDS_CHANGED
-
-
-class MatchFinishedEvent(LiveEvent):
-    """Emitted when a match finishes."""
-
-    event_type: EventType = EventType.MATCH_FINISHED
-
-
-class HeartbeatEvent(LiveEvent):
-    """Periodic heartbeat event for health monitoring."""
-
-    event_type: EventType = EventType.HEARTBEAT
 
 
 class WorkerInfo(BaseModel):

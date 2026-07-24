@@ -16,7 +16,6 @@ from app.application.dto.live_dto import (
 )
 from app.application.mapper import Mapper
 from app.core.container import get_container
-from app.live.models import WorkerInfo, WorkerStatus
 from app.logging import get_logger
 
 logger = get_logger(__name__)
@@ -44,20 +43,12 @@ class LiveService:
                 matches.append(Mapper.to_live_match_dto(match_data))
         return matches
 
-    def get_workers(self) -> list[WorkerDTO]:
-        """Get all worker information."""
+    async def get_workers(self) -> list[WorkerDTO]:
+        """Get all worker information from State Registry."""
         container = get_container()
         engine = container.live_engine
-        result: list[WorkerDTO] = []
-        for worker in engine.components.workers:
-            info = WorkerInfo(
-                worker_id=worker.worker_id,
-                status=WorkerStatus.PROCESSING if worker.is_busy else WorkerStatus.IDLE,
-                processed_count=worker.processed_count,
-                error_count=worker.error_count,
-            )
-            result.append(Mapper.to_worker_dto(info))
-        return result
+        workers_dict = await engine.state.get_all_workers()
+        return [Mapper.to_worker_dto(w) for w in workers_dict.values()]
 
     def get_events(self, limit: int = 50) -> list[LiveEventDTO]:
         """Get recent live events."""

@@ -49,7 +49,7 @@ async def get_live_workers(
     service: LiveService = Depends(get_live_service),
 ) -> list[WorkerDTO]:
     """Get worker information."""
-    return service.get_workers()
+    return await service.get_workers()
 
 
 @router.get("/live/events", response_model=list[LiveEventDTO])

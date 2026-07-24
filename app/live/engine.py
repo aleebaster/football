@@ -59,12 +59,17 @@ class LiveEngine:
         # Discovery
         self._discovery = MatchDiscovery(provider_manager)
 
-        # Workers
+        # Workers — inject engines via DI (no service locator)
+        from app.core.container import get_container
+
+        container = get_container()
         self._workers = [
             LiveWorker(
                 worker_id=f"worker_{i}",
                 provider_manager=provider_manager,
                 state_registry=self._state_registry,
+                prediction_engine=container.prediction_engine,
+                signal_engine=container.signal_engine,
             )
             for i in range(num_workers)
         ]
