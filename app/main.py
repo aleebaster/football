@@ -136,6 +136,11 @@ def create_app() -> FastAPI:
     application.include_router(configuration_router, tags=["Configuration"])
     application.include_router(live_router, tags=["Live"])
 
+    # Live Dashboard endpoints
+    from app.api.routers import live_dashboard_router
+
+    application.include_router(live_dashboard_router, tags=["Live Dashboard"])
+
     return application
 
 

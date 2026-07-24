@@ -7,9 +7,11 @@ Pipeline:
 from __future__ import annotations
 
 import asyncio
+import uuid
 
 from app.live.dispatcher import EventDispatcher
 from app.live.events import LiveEvent
+from app.live.logging_context import LogContext, Timer, log_with_context
 from app.live.matcher import MatchDiscovery
 from app.live.models import LiveMatch, MatchState
 from app.live.queue import MatchQueue
@@ -74,27 +76,47 @@ class LiveCoordinator:
 
     async def run_cycle(self) -> None:
         """Run a single discovery → process cycle."""
-        try:
-            # Step 1: Discover matches
-            matches = await self._discovery.discover()
+        ctx = LogContext(correlation_id=f"coord_{uuid.uuid4().hex[:8]}")
 
-            # Step 2: Enqueue discovered matches
-            for match in matches:
-                await self._state_registry.store_match(match)
-                if match.state in (
-                    MatchState.LIVE,
-                    MatchState.HALF_TIME,
-                    MatchState.SECOND_HALF,
-                ):
-                    await self._queue.enqueue_priority(match)
-                else:
-                    await self._queue.enqueue(match)
+        with ctx:
+            with Timer() as timer:
+                try:
+                    # Step 1: Discover matches
+                    discovery_timer = Timer()
+                    with discovery_timer:
+                        matches = await self._discovery.discover()
 
-            # Step 3: Dispatch matches to idle workers
-            await self._dispatch_to_workers()
+                    log_with_context(
+                        logger,
+                        "debug",
+                        f"Discovery found {len(matches)} matches in {discovery_timer.elapsed_ms:.1f}ms",
+                    )
 
-        except Exception as e:
-            logger.warning(f"Coordinator cycle failed: {e}")
+                    # Step 2: Enqueue discovered matches
+                    for match in matches:
+                        await self._state_registry.store_match(match)
+                        if match.state in (
+                            MatchState.LIVE,
+                            MatchState.HALF_TIME,
+                            MatchState.SECOND_HALF,
+                        ):
+                            await self._queue.enqueue_priority(match)
+                        else:
+                            await self._queue.enqueue(match)
+
+                    # Step 3: Dispatch matches to idle workers
+                    await self._dispatch_to_workers()
+
+                except Exception as e:
+                    log_with_context(
+                        logger, "warning", f"Coordinator cycle failed: {e}"
+                    )
+
+            log_with_context(
+                logger,
+                "debug",
+                f"Coordinator cycle completed in {timer.elapsed_ms:.1f}ms",
+            )
 
     async def _dispatch_to_workers(self) -> None:
         """Dispatch queued matches to idle workers."""
@@ -110,20 +132,28 @@ class LiveCoordinator:
 
     async def _process_with_worker(self, worker: LiveWorker, match: LiveMatch) -> None:
         """Process a match with a specific worker and publish events."""
-        try:
-            events = await worker.process(match)
-            if events:
-                await self._dispatcher.dispatch_many(events)
-                for _ in events:
-                    self._state_registry.increment_events_published()
+        ctx = LogContext(
+            worker_id=worker.worker_id,
+            match_id=match.fixture_id,
+        )
 
-            # Mark as processed in queue
-            await self._queue.mark_processed(match.fixture_id)
+        with ctx:
+            try:
+                events = await worker.process(match)
+                if events:
+                    await self._dispatcher.dispatch_many(events)
+                    for _ in events:
+                        self._state_registry.increment_events_published()
 
-        except Exception as e:
-            logger.warning(
-                f"Worker {worker.worker_id} failed on fixture {match.fixture_id}: {e}"
-            )
+                # Mark as processed in queue
+                await self._queue.mark_processed(match.fixture_id)
+
+            except Exception as e:
+                log_with_context(
+                    logger,
+                    "warning",
+                    f"Worker {worker.worker_id} failed on fixture {match.fixture_id}: {e}",
+                )
 
     async def process_single(self, match: LiveMatch) -> list[LiveEvent]:
         """Process a single match immediately (bypasses queue)."""

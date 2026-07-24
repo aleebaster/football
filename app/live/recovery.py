@@ -11,9 +11,10 @@ Provides separate recovery mechanisms:
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from typing import Any
 
+from app.live.logging_context import log_with_context
 from app.live.queue import MatchQueue
 from app.logging import get_logger
 
@@ -59,7 +60,11 @@ class WorkerRecovery:
         self._retry_policy = retry_policy or RetryPolicy()
         self._failed_workers: dict[str, int] = {}
 
-    async def recover(self, worker_id: str, restart_fn: Any) -> bool:
+    async def recover(
+        self,
+        worker_id: str,
+        restart_fn: Callable[[], Awaitable[bool]],
+    ) -> bool:
         """Attempt to recover a failed worker.
 
         Args:
@@ -73,26 +78,34 @@ class WorkerRecovery:
 
         while self._retry_policy.should_retry():
             try:
-                logger.info(
+                log_with_context(
+                    logger,
+                    "info",
                     f"Attempting worker recovery for {worker_id} "
-                    f"(attempt {self._retry_policy.attempt + 1})"
+                    f"(attempt {self._retry_policy.attempt + 1})",
                 )
                 await restart_fn()
                 self._failed_workers.pop(worker_id, None)
-                logger.info(f"Worker {worker_id} recovered successfully")
+                log_with_context(
+                    logger, "info", f"Worker {worker_id} recovered successfully"
+                )
                 return True
             except Exception as e:
                 self._retry_policy.record_attempt()
                 delay = self._retry_policy.get_delay()
-                logger.warning(
+                log_with_context(
+                    logger,
+                    "warning",
                     f"Worker {worker_id} recovery attempt {self._retry_policy.attempt} "
-                    f"failed: {e}. Retrying in {delay:.1f}s"
+                    f"failed: {e}. Retrying in {delay:.1f}s",
                 )
                 await asyncio.sleep(delay)
 
         self._failed_workers[worker_id] = self._retry_policy.attempt
-        logger.error(
-            f"Worker {worker_id} recovery failed after {self._retry_policy.max_retries} attempts"
+        log_with_context(
+            logger,
+            "error",
+            f"Worker {worker_id} recovery failed after {self._retry_policy.max_retries} attempts",
         )
         return False
 
@@ -109,7 +122,11 @@ class ProviderFailureRecovery:
             max_retries=5, base_delay=2.0, max_delay=60.0
         )
 
-    async def recover(self, provider_name: str, recovery_fn: Any) -> bool:
+    async def recover(
+        self,
+        provider_name: str,
+        recovery_fn: Callable[[], Awaitable[bool]],
+    ) -> bool:
         """Attempt to recover from a provider failure.
 
         Args:
@@ -123,25 +140,33 @@ class ProviderFailureRecovery:
 
         while self._retry_policy.should_retry():
             try:
-                logger.info(
+                log_with_context(
+                    logger,
+                    "info",
                     f"Attempting provider recovery for {provider_name} "
-                    f"(attempt {self._retry_policy.attempt + 1})"
+                    f"(attempt {self._retry_policy.attempt + 1})",
                 )
                 await recovery_fn()
-                logger.info(f"Provider {provider_name} recovered successfully")
+                log_with_context(
+                    logger, "info", f"Provider {provider_name} recovered successfully"
+                )
                 return True
             except Exception as e:
                 self._retry_policy.record_attempt()
                 delay = self._retry_policy.get_delay()
-                logger.warning(
+                log_with_context(
+                    logger,
+                    "warning",
                     f"Provider {provider_name} recovery attempt {self._retry_policy.attempt} "
-                    f"failed: {e}. Retrying in {delay:.1f}s"
+                    f"failed: {e}. Retrying in {delay:.1f}s",
                 )
                 await asyncio.sleep(delay)
 
-        logger.error(
+        log_with_context(
+            logger,
+            "error",
             f"Provider {provider_name} recovery failed after "
-            f"{self._retry_policy.max_retries} attempts"
+            f"{self._retry_policy.max_retries} attempts",
         )
         return False
 
@@ -206,7 +231,11 @@ class SchedulerRecovery:
         self._consecutive_failures: int = 0
         self._max_consecutive_failures: int = 5
 
-    async def recover(self, scheduler_name: str, restart_fn: Any) -> bool:
+    async def recover(
+        self,
+        scheduler_name: str,
+        restart_fn: Callable[[], Awaitable[bool]],
+    ) -> bool:
         """Attempt to recover a failed scheduler.
 
         Args:
@@ -220,27 +249,35 @@ class SchedulerRecovery:
 
         while self._retry_policy.should_retry():
             try:
-                logger.info(
+                log_with_context(
+                    logger,
+                    "info",
                     f"Attempting scheduler recovery for {scheduler_name} "
-                    f"(attempt {self._retry_policy.attempt + 1})"
+                    f"(attempt {self._retry_policy.attempt + 1})",
                 )
                 await restart_fn()
                 self._consecutive_failures = 0
-                logger.info(f"Scheduler {scheduler_name} recovered successfully")
+                log_with_context(
+                    logger, "info", f"Scheduler {scheduler_name} recovered successfully"
+                )
                 return True
             except Exception as e:
                 self._retry_policy.record_attempt()
                 self._consecutive_failures += 1
                 delay = self._retry_policy.get_delay()
-                logger.warning(
+                log_with_context(
+                    logger,
+                    "warning",
                     f"Scheduler {scheduler_name} recovery attempt {self._retry_policy.attempt} "
-                    f"failed: {e}. Retrying in {delay:.1f}s"
+                    f"failed: {e}. Retrying in {delay:.1f}s",
                 )
                 await asyncio.sleep(delay)
 
-        logger.error(
+        log_with_context(
+            logger,
+            "error",
             f"Scheduler {scheduler_name} recovery failed after "
-            f"{self._retry_policy.max_retries} attempts"
+            f"{self._retry_policy.max_retries} attempts",
         )
         return False
 

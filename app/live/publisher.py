@@ -37,7 +37,9 @@ class EventPublisher:
     def register(self, handler: EventHandler) -> None:
         """Register an event handler."""
         self._handlers.append(handler)
-        logger.debug(f"Registered event handler: {handler.__qualname__}")
+        logger.debug(
+            f"Registered event handler: {getattr(handler, '__qualname__', type(handler).__name__)}"
+        )
 
     def unregister(self, handler: EventHandler) -> None:
         """Unregister an event handler."""
@@ -66,7 +68,7 @@ class EventPublisher:
             await handler(event)
         except Exception as e:
             logger.warning(
-                f"Handler {handler.__qualname__} failed for {event.event_type}: {e}"
+                f"Handler {getattr(handler, '__qualname__', type(handler).__name__)} failed for {event.event_type}: {e}"
             )
 
     def get_recent_events(self, limit: int = 50) -> list[LiveEvent]:

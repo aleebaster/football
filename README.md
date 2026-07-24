@@ -40,6 +40,13 @@ Provider Layer (Multi-source data abstraction)
 | GET | `/statistics/teams` | Statistics broken down by team (placeholder) |
 | GET | `/providers` | Provider health and status |
 | GET | `/configuration` | Application configuration |
+| GET | `/live` | Live engine status |
+| GET | `/live/matches` | Active live matches |
+| GET | `/live/workers` | Worker information |
+| GET | `/live/events` | Recent live events |
+| GET | `/live/metrics` | Live engine metrics |
+| GET | `/live/heartbeat` | Heartbeat information |
+| GET | `/live/state` | Current match states |
 
 ### Request/Response
 
@@ -65,6 +72,8 @@ The Dashboard provides a structured view of the system status, predictions, sign
 
 ### Dashboard Pages
 
+### Static Pages
+
 | Page | Description |
 |------|-------------|
 | Overview | System overview with key metrics (predictions, signals, win rate, ROI) |
@@ -75,6 +84,19 @@ The Dashboard provides a structured view of the system status, predictions, sign
 | Statistics | Overall performance statistics |
 | Health | System health status (providers, engines, cache, database) |
 | Configuration | Application configuration view |
+
+### Live Engine Pages
+
+| Page | Endpoint | Description |
+|------|----------|-------------|
+| Live Overview | `GET /dashboard/live` | Live engine status overview |
+| Live Matches | `GET /dashboard/live/matches` | Currently tracked matches with state and score |
+| Workers | `GET /dashboard/live/workers` | Worker pool status and utilization |
+| Heartbeat | `GET /dashboard/live/heartbeat` | System health heartbeat and component status |
+| Live Metrics | `GET /dashboard/live/metrics` | Real-time performance metrics |
+| Recent Events | `GET /dashboard/live/events` | Recent events published by the Live Engine |
+| Provider Health | `GET /dashboard/live/providers` | Data provider health status |
+| Queue Status | `GET /dashboard/live/queue` | Match processing queue status |
 
 ### Dashboard Widgets
 
@@ -124,6 +146,7 @@ This allows the same logic to be reused for REST API, Dashboard, CLI, Telegram, 
 | `StatisticsService` | Statistics aggregation from backtest results |
 | `ProviderService` | Provider health and metadata |
 | `ConfigurationService` | Application configuration |
+| `LiveService` | Live engine status, matches, workers, events, metrics, heartbeat |
 
 ### DTOs (Data Transfer Objects)
 
@@ -142,6 +165,13 @@ All API responses use Pydantic DTOs — never internal engine models:
 | `TeamStatisticsDTO` | Per-team statistics |
 | `ProviderDTO` / `ProviderListDTO` | Provider health data |
 | `ConfigurationDTO` | Application config |
+| `LiveMatchDTO` | Live match data |
+| `LiveEventDTO` | Live event data |
+| `WorkerDTO` | Worker status data |
+| `HeartbeatDTO` | Heartbeat status data |
+| `LiveMetricsDTO` | Live engine metrics |
+| `LiveStatusDTO` | Overall live engine status |
+| `LiveSignalDTO` | Live signal data |
 
 ### Mapper
 
@@ -385,6 +415,175 @@ ruff check .
 
 # Formatting
 ruff format .
+```
+
+---
+
+## Live Engine
+
+The Live Engine provides real-time match tracking, live predictions, and signal generation.
+
+### Pipeline
+
+```
+Scheduler → Discovery → Queue → Worker → Provider → AI → Prediction → Signal → Publisher
+```
+
+### Components
+
+| Component | File | Description |
+|-----------|------|-------------|
+| `LiveEngine` | `app/live/engine.py` | Main entry point, coordinates all components |
+| `LiveScheduler` | `app/live/scheduler.py` | Periodic discovery cycle scheduler (APScheduler) |
+| `LiveCoordinator` | `app/live/coordinator.py` | Orchestrates discovery → queue → worker dispatch |
+| `LiveWorker` | `app/live/worker.py` | Processes individual matches through the full pipeline |
+| `MatchQueue` | `app/live/queue.py` | Priority queue for match processing order |
+| `MatchDiscovery` | `app/live/matcher.py` | Discovers upcoming and live matches via Provider Layer |
+| `EventPublisher` | `app/live/publisher.py` | Broadcasts events to all subscribers (REST, Dashboard, Telegram) |
+| `EventDispatcher` | `app/live/dispatcher.py` | Routes events through the Publisher |
+| `StateRegistry` | `app/live/state.py` | Central state for matches, workers, and engine health |
+| `HeartbeatMonitor` | `app/live/heartbeat.py` | Periodic health monitoring (workers, providers, scheduler) |
+| `LiveMetricsCollector` | `app/live/metrics.py` | Collects and reports performance metrics |
+| `LiveComponentRegistry` | `app/live/registry.py` | Registry for accessing all Live Engine sub-components |
+
+### Live Engine Architecture
+
+```
+app/live/
+├── engine.py            # Main LiveEngine entry point
+├── scheduler.py         # Periodic discovery cycle (APScheduler)
+├── coordinator.py       # Orchestrates discovery → queue → worker
+├── worker.py            # Processes individual matches
+├── queue.py             # Priority match processing queue
+├── matcher.py           # Match discovery via Provider Layer
+├── events.py            # Event models and factory
+├── publisher.py         # Event broadcasting to subscribers
+├── dispatcher.py        # Event routing to channels
+├── state.py             # State registry for matches and workers
+├── models.py            # Pydantic models (LiveMatch, WorkerInfo, etc.)
+├── interfaces.py        # Abstract interfaces for all components
+├── exceptions.py        # Custom exceptions
+├── heartbeat.py         # Health monitoring
+├── metrics.py           # Performance metrics collection
+├── logging_context.py   # Structured logging (correlation ID, worker ID, etc.)
+├── recovery.py          # Recovery layer (worker, provider, queue, scheduler)
+└── registry.py          # Component registry
+```
+
+### Live Engine Pipeline
+
+1. **Scheduler** triggers a discovery cycle at configurable intervals
+2. **Discovery** fetches upcoming and live matches from the Provider Layer
+3. **Queue** enqueues matches (priority queue for LIVE/HALF_TIME states)
+4. **Workers** process matches in parallel (configurable pool size)
+5. **Pipeline** per match: Provider Update → AI Analysis → Prediction → Signal
+6. **Publisher** broadcasts events to all registered handlers
+7. **State Registry** tracks match states, worker health, and engine metrics
+
+### How It Works
+
+```python
+from app.core.container import get_container
+
+container = get_container()
+live_engine = container.live_engine
+await live_engine.start()  # Starts scheduler, heartbeat, workers
+# ... application runs ...
+await live_engine.stop()   # Graceful shutdown
+```
+
+### Event Types
+
+| Event | Description |
+|-------|-------------|
+| `match_started` | Match transitions to LIVE |
+| `prediction_updated` | Predictions are updated for a live match |
+| `signal_created` | New signal generated for a live match |
+| `signal_updated` | Existing signal updated |
+| `goal` | Goal scored |
+| `odds_changed` | Odds change significantly |
+| `match_finished` | Match finishes |
+| `heartbeat` | Periodic health event |
+
+### How to Add a New Event
+
+1. Add event class in `app/live/events.py`:
+
+```python
+class MyNewEvent(LiveEvent):
+    event_type: str = "my_new_event"
+```
+
+2. Add factory method in `EventFactory`:
+
+```python
+@staticmethod
+def my_new_event(fixture_id: int, **kwargs) -> MyNewEvent:
+    return MyNewEvent(event_id=f"evt_{uuid.uuid4().hex[:12]}", fixture_id=fixture_id, data=kwargs)
+```
+
+3. Use the factory in the Worker pipeline or other components.
+
+### How to Add a New Worker
+
+Workers implement the `WorkerInterface` and are created by the `LiveEngine`:
+
+```python
+class LiveWorker(WorkerInterface):
+    async def process(self, match: LiveMatch) -> list[LiveEvent]:
+        # Implement pipeline: Provider → AI → Prediction → Signal
+        ...
+```
+
+Workers are configured via the `LiveEngine` constructor (`num_workers` parameter) and receive engines via Dependency Injection (not Service Locator).
+
+### How to Add a New Publisher
+
+Publishers are handlers registered with the `EventPublisher`:
+
+```python
+async def my_handler(event: LiveEvent) -> None:
+    # Process the event (e.g., send to WebSocket, log, etc.)
+    ...
+
+publisher.register(my_handler)
+```
+
+### How Recovery Works
+
+The Recovery Layer provides fault tolerance for all critical components:
+
+| Recovery | Triggers On | Action |
+|----------|-------------|--------|
+| `WorkerRecovery` | Worker pipeline failure | Restart worker with exponential backoff |
+| `SchedulerRecovery` | Scheduler cycle failure | Restart coordinator cycle |
+| `ProviderFailureRecovery` | Provider failure | Reconnect with retry policy |
+| `QueueRecovery` | Queue stuck/corrupted | Clear stale entries |
+
+All recovery mechanisms use a configurable `RetryPolicy` with exponential backoff.
+
+### Structured Logging
+
+All Live Engine logs include structured context fields via `LogContext`:
+
+| Field | Description |
+|-------|-------------|
+| `correlation_id` | Traces a request across components |
+| `worker_id` | Identifies which worker is processing |
+| `match_id` | Identifies which match is being processed |
+| `event_id` | Identifies which event is being processed |
+| `scheduler_cycle` | Identifies which scheduler cycle is running |
+| `execution_time_ms` | Tracks how long an operation took |
+| `provider_time_ms` | Tracks provider response time |
+
+```python
+from app.live.logging_context import LogContext, Timer, log_with_context
+
+ctx = LogContext(correlation_id="abc123", worker_id="worker_0", match_id=12345)
+with ctx:
+    with Timer() as timer:
+        result = await do_work()
+    log_with_context(logger, "info", f"Done in {timer.elapsed_ms:.1f}ms")
 ```
 
 ### Environment Variables

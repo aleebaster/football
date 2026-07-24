@@ -13,8 +13,16 @@ from typing import Any
 
 from app.application.dto.backtest_dto import BacktestDTO
 from app.application.dto.health_dto import HealthDTO
+from app.application.dto.live_dto import (
+    HeartbeatDTO,
+    LiveEventDTO,
+    LiveMatchDTO,
+    LiveMetricsDTO,
+    LiveStatusDTO,
+    WorkerDTO,
+)
 from app.application.dto.prediction_dto import PredictionDTO
-from app.application.dto.provider_dto import ProviderListDTO
+from app.application.dto.provider_dto import ProviderDTO, ProviderListDTO
 from app.application.dto.signal_dto import SignalListDTO
 from app.application.dto.statistics_dto import OverallStatisticsDTO
 
@@ -148,3 +156,174 @@ class DashboardPresenter:
             "═══════════════════════════════════════════",
         ]
         return "\n".join(lines)
+
+
+class LiveDashboardPresenter:
+    """Transforms Live Engine DTOs into dashboard-friendly ViewModels.
+
+    Pipeline:
+        LiveService → LiveDTO → LiveDashboardPresenter → View
+
+    This presenter receives DTOs from the Application Layer and
+    produces ViewModel dicts consumed by the live dashboard pages.
+    It does NOT access any Live Engine directly.
+    """
+
+    @staticmethod
+    def present_live_matches(
+        matches: list[LiveMatchDTO],
+        active_count: int = 0,
+    ) -> dict[str, Any]:
+        """Build the Live Matches ViewModel from DTOs."""
+        live_count = len(
+            [m for m in matches if m.state in ("live", "half_time", "second_half")]
+        )
+        scheduled_count = len([m for m in matches if m.state == "scheduled"])
+
+        return {
+            "active_count": active_count,
+            "live_count": live_count,
+            "scheduled_count": scheduled_count,
+            "total": len(matches),
+            "matches": [
+                {
+                    "fixture_id": m.fixture_id,
+                    "home_team": m.home_team,
+                    "away_team": m.away_team,
+                    "competition": m.competition_name or "N/A",
+                    "state": m.state,
+                    "score": f"{m.home_score if m.home_score is not None else '-'} - {m.away_score if m.away_score is not None else '-'}",
+                    "status": m.status,
+                }
+                for m in matches
+            ],
+        }
+
+    @staticmethod
+    def present_workers(
+        workers: list[WorkerDTO],
+    ) -> dict[str, Any]:
+        """Build the Workers ViewModel from DTOs."""
+        total = len(workers)
+        active = len([w for w in workers if w.status == "processing"])
+        idle = len([w for w in workers if w.status == "idle"])
+        errors = len([w for w in workers if w.status == "error"])
+
+        return {
+            "total": total,
+            "active": active,
+            "idle": idle,
+            "errors": errors,
+            "workers": [
+                {
+                    "worker_id": w.worker_id,
+                    "status": w.status,
+                    "current_fixture_id": w.current_fixture_id,
+                    "processed_count": w.processed_count,
+                    "error_count": w.error_count,
+                    "last_active": w.last_active.isoformat()
+                    if w.last_active
+                    else "N/A",
+                }
+                for w in workers
+            ],
+        }
+
+    @staticmethod
+    def present_heartbeat(
+        heartbeat: HeartbeatDTO,
+    ) -> dict[str, Any]:
+        """Build the Heartbeat ViewModel from DTOs."""
+        scheduler_ok = heartbeat.scheduler_running
+        provider_ok = heartbeat.provider_healthy
+        workers_healthy = heartbeat.workers_healthy
+        workers_total = heartbeat.workers_total
+
+        return {
+            "scheduler_status": "Running" if scheduler_ok else "Stopped",
+            "scheduler_ok": scheduler_ok,
+            "provider_status": "Healthy" if provider_ok else "Unhealthy",
+            "provider_ok": provider_ok,
+            "workers_healthy": workers_healthy,
+            "workers_total": workers_total,
+            "workers_ok": workers_healthy == workers_total,
+            "uptime_seconds": heartbeat.uptime_seconds,
+            "queue_size": heartbeat.queue_size,
+        }
+
+    @staticmethod
+    def present_metrics(
+        metrics: LiveMetricsDTO,
+    ) -> dict[str, Any]:
+        """Build the Live Metrics ViewModel from DTOs."""
+        return {
+            "active_matches": metrics.active_matches,
+            "workers_active": metrics.workers_active,
+            "workers_total": metrics.workers_total,
+            "queue_size": metrics.queue_size,
+            "events_published": metrics.events_published,
+            "avg_prediction_time_ms": round(metrics.avg_prediction_time_ms, 1),
+            "avg_signal_time_ms": round(metrics.avg_signal_time_ms, 1),
+            "provider_latency_ms": round(metrics.provider_latency_ms, 1),
+            "uptime_seconds": metrics.uptime_seconds,
+        }
+
+    @staticmethod
+    def present_recent_events(
+        events: list[LiveEventDTO],
+    ) -> dict[str, Any]:
+        """Build the Recent Events ViewModel from DTOs."""
+        return {
+            "total": len(events),
+            "event_types": len({e.event_type for e in events}),
+            "events": [
+                {
+                    "event_id": e.event_id[:12],
+                    "event_type": e.event_type,
+                    "fixture_id": e.fixture_id,
+                    "correlation_id": e.correlation_id or "-",
+                    "worker_id": e.worker_id or "-",
+                    "timestamp": e.timestamp.isoformat(),
+                }
+                for e in events
+            ],
+        }
+
+    @staticmethod
+    def present_provider_health(
+        providers: list[ProviderDTO],
+    ) -> dict[str, Any]:
+        """Build the Provider Health ViewModel from DTOs."""
+        healthy = len([p for p in providers if p.status == "healthy"])
+        total = len(providers)
+
+        return {
+            "healthy_count": healthy,
+            "total_count": total,
+            "all_healthy": healthy == total,
+            "providers": [
+                {
+                    "name": p.name,
+                    "status": p.status,
+                    "success_rate": round(p.success_rate * 100, 1),
+                    "avg_response_ms": round(p.avg_response_ms, 0),
+                    "total_requests": p.total_requests,
+                    "consecutive_failures": p.consecutive_failures,
+                }
+                for p in providers
+            ],
+        }
+
+    @staticmethod
+    def present_queue_status(
+        status: LiveStatusDTO,
+    ) -> dict[str, Any]:
+        """Build the Queue Status ViewModel from DTOs."""
+        return {
+            "queue_size": status.queue_size,
+            "active_matches": status.active_matches,
+            "workers_active": status.workers_active,
+            "workers_total": status.workers_total,
+            "events_published": status.events_published,
+            "uptime_seconds": status.uptime_seconds,
+        }

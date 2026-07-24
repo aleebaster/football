@@ -7,6 +7,7 @@ Always map through this layer.
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from typing import TYPE_CHECKING
 
 from app.application.dto.backtest_dto import BacktestDTO, BacktestSummaryDTO
 from app.application.dto.health_dto import (
@@ -38,6 +39,10 @@ from app.application.dto.statistics_dto import (
     TeamStatisticsDTO,
 )
 from app.providers.models import Fixture
+
+if TYPE_CHECKING:
+    from app.live.events import LiveEvent
+    from app.live.models import HeartbeatInfo, LiveMatch, LiveMetrics, WorkerInfo
 
 
 class Mapper:
@@ -79,35 +84,29 @@ class Mapper:
     # ── Live ─────────────────────────────────────────────────────────
 
     @staticmethod
-    def to_live_match_dto(match: object) -> LiveMatchDTO:
-        from app.live.models import LiveMatch
-
-        m = match if isinstance(match, LiveMatch) else None
-        if m is None:
+    def to_live_match_dto(match: LiveMatch | None) -> LiveMatchDTO:
+        if match is None:
             return LiveMatchDTO(fixture_id=0)
         return LiveMatchDTO(
-            fixture_id=m.fixture_id,
-            home_team=m.home_team,
-            away_team=m.away_team,
-            competition_name=m.competition_name,
-            status=m.status,
-            state=m.state.value,
-            home_score=m.home_score,
-            away_score=m.away_score,
-            utc_date=m.utc_date,
-            last_updated=m.last_updated,
+            fixture_id=match.fixture_id,
+            home_team=match.home_team,
+            away_team=match.away_team,
+            competition_name=match.competition_name,
+            status=match.status,
+            state=match.state.value,
+            home_score=match.home_score,
+            away_score=match.away_score,
+            utc_date=match.utc_date,
+            last_updated=match.last_updated,
         )
 
     @staticmethod
-    def to_live_match_dtos(matches: list[object]) -> list[LiveMatchDTO]:
+    def to_live_match_dtos(matches: list[LiveMatch]) -> list[LiveMatchDTO]:
         return [Mapper.to_live_match_dto(m) for m in matches]
 
     @staticmethod
-    def to_live_event_dto(event: object) -> LiveEventDTO:
-        from app.live.events import LiveEvent
-
-        e = event if isinstance(event, LiveEvent) else None
-        if e is None:
+    def to_live_event_dto(event: LiveEvent | None) -> LiveEventDTO:
+        if event is None:
             return LiveEventDTO(
                 event_id="",
                 event_type="",
@@ -115,73 +114,64 @@ class Mapper:
                 timestamp=datetime.now(UTC),
             )
         return LiveEventDTO(
-            event_id=e.event_id,
-            event_type=e.event_type,
-            fixture_id=e.fixture_id,
-            timestamp=e.timestamp,
-            data=e.data,
-            correlation_id=e.correlation_id,
-            worker_id=e.worker_id,
+            event_id=event.event_id,
+            event_type=event.event_type,
+            fixture_id=event.fixture_id,
+            timestamp=event.timestamp,
+            data=event.data,
+            correlation_id=event.correlation_id,
+            worker_id=event.worker_id,
         )
 
     @staticmethod
-    def to_live_event_dtos(events: list[object]) -> list[LiveEventDTO]:
+    def to_live_event_dtos(events: list[LiveEvent]) -> list[LiveEventDTO]:
         return [Mapper.to_live_event_dto(e) for e in events]
 
     @staticmethod
-    def to_worker_dto(worker: object) -> WorkerDTO:
-        from app.live.models import WorkerInfo
-
-        w = worker if isinstance(worker, WorkerInfo) else None
-        if w is None:
+    def to_worker_dto(worker: WorkerInfo | None) -> WorkerDTO:
+        if worker is None:
             return WorkerDTO(worker_id="unknown")
         return WorkerDTO(
-            worker_id=w.worker_id,
-            status=w.status.value,
-            current_fixture_id=w.current_fixture_id,
-            processed_count=w.processed_count,
-            error_count=w.error_count,
-            last_active=w.last_active,
+            worker_id=worker.worker_id,
+            status=worker.status.value,
+            current_fixture_id=worker.current_fixture_id,
+            processed_count=worker.processed_count,
+            error_count=worker.error_count,
+            last_active=worker.last_active,
         )
 
     @staticmethod
-    def to_worker_dtos(workers: list[object]) -> list[WorkerDTO]:
+    def to_worker_dtos(workers: list[WorkerInfo]) -> list[WorkerDTO]:
         return [Mapper.to_worker_dto(w) for w in workers]
 
     @staticmethod
-    def to_heartbeat_dto(heartbeat: object) -> HeartbeatDTO:
-        from app.live.models import HeartbeatInfo
-
-        h = heartbeat if isinstance(heartbeat, HeartbeatInfo) else None
-        if h is None:
+    def to_heartbeat_dto(heartbeat: HeartbeatInfo | None) -> HeartbeatDTO:
+        if heartbeat is None:
             return HeartbeatDTO(timestamp=datetime.now(UTC))
         return HeartbeatDTO(
-            timestamp=h.timestamp,
-            scheduler_running=h.scheduler_running,
-            workers_healthy=h.workers_healthy,
-            workers_total=h.workers_total,
-            provider_healthy=h.provider_healthy,
-            queue_size=h.queue_size,
-            uptime_seconds=h.uptime_seconds,
+            timestamp=heartbeat.timestamp,
+            scheduler_running=heartbeat.scheduler_running,
+            workers_healthy=heartbeat.workers_healthy,
+            workers_total=heartbeat.workers_total,
+            provider_healthy=heartbeat.provider_healthy,
+            queue_size=heartbeat.queue_size,
+            uptime_seconds=heartbeat.uptime_seconds,
         )
 
     @staticmethod
-    def to_live_metrics_dto(metrics: object) -> LiveMetricsDTO:
-        from app.live.models import LiveMetrics
-
-        m = metrics if isinstance(metrics, LiveMetrics) else None
-        if m is None:
+    def to_live_metrics_dto(metrics: LiveMetrics | None) -> LiveMetricsDTO:
+        if metrics is None:
             return LiveMetricsDTO()
         return LiveMetricsDTO(
-            active_matches=m.active_matches,
-            workers_active=m.workers_active,
-            workers_total=m.workers_total,
-            queue_size=m.queue_size,
-            events_published=m.events_published,
-            provider_latency_ms=m.provider_latency_ms,
-            avg_prediction_time_ms=m.avg_prediction_time_ms,
-            avg_signal_time_ms=m.avg_signal_time_ms,
-            uptime_seconds=m.uptime_seconds,
+            active_matches=metrics.active_matches,
+            workers_active=metrics.workers_active,
+            workers_total=metrics.workers_total,
+            queue_size=metrics.queue_size,
+            events_published=metrics.events_published,
+            provider_latency_ms=metrics.provider_latency_ms,
+            avg_prediction_time_ms=metrics.avg_prediction_time_ms,
+            avg_signal_time_ms=metrics.avg_signal_time_ms,
+            uptime_seconds=metrics.uptime_seconds,
         )
 
     @staticmethod

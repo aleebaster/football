@@ -486,6 +486,333 @@ class TestPageFactory:
         assert page.title == "Configuration"
 
 
+# ===== LiveDashboardPresenter Tests =====
+
+
+class TestLiveDashboardPresenter:
+    def test_present_live_matches(self) -> None:
+        from app.application.dto.live_dto import LiveMatchDTO
+        from app.dashboard.presenters import LiveDashboardPresenter
+
+        matches = [
+            LiveMatchDTO(
+                fixture_id=1,
+                home_team="Arsenal",
+                away_team="Chelsea",
+                state="live",
+                status="IN_PLAY",
+                home_score=2,
+                away_score=1,
+            ),
+            LiveMatchDTO(
+                fixture_id=2,
+                home_team="Barcelona",
+                away_team="Real Madrid",
+                state="scheduled",
+                status="TIMED",
+            ),
+        ]
+        vm = LiveDashboardPresenter.present_live_matches(matches, active_count=2)
+        assert vm["active_count"] == 2
+        assert vm["live_count"] == 1
+        assert vm["scheduled_count"] == 1
+        assert vm["total"] == 2
+        assert len(vm["matches"]) == 2
+        assert vm["matches"][0]["home_team"] == "Arsenal"
+        assert vm["matches"][0]["score"] == "2 - 1"
+
+    def test_present_workers(self) -> None:
+        from app.application.dto.live_dto import WorkerDTO
+        from app.dashboard.presenters import LiveDashboardPresenter
+
+        workers = [
+            WorkerDTO(worker_id="w1", status="processing", processed_count=5),
+            WorkerDTO(worker_id="w2", status="idle", processed_count=3),
+            WorkerDTO(worker_id="w3", status="error", error_count=1),
+        ]
+        vm = LiveDashboardPresenter.present_workers(workers)
+        assert vm["total"] == 3
+        assert vm["active"] == 1
+        assert vm["idle"] == 1
+        assert vm["errors"] == 1
+        assert len(vm["workers"]) == 3
+        assert vm["workers"][0]["worker_id"] == "w1"
+        assert vm["workers"][0]["status"] == "processing"
+
+    def test_present_heartbeat(self) -> None:
+        from datetime import UTC, datetime
+
+        from app.application.dto.live_dto import HeartbeatDTO
+        from app.dashboard.presenters import LiveDashboardPresenter
+
+        hb = HeartbeatDTO(
+            timestamp=datetime.now(UTC),
+            scheduler_running=True,
+            workers_healthy=3,
+            workers_total=3,
+            provider_healthy=True,
+            queue_size=5,
+            uptime_seconds=3600.0,
+        )
+        vm = LiveDashboardPresenter.present_heartbeat(hb)
+        assert vm["scheduler_status"] == "Running"
+        assert vm["scheduler_ok"] is True
+        assert vm["provider_status"] == "Healthy"
+        assert vm["provider_ok"] is True
+        assert vm["workers_healthy"] == 3
+        assert vm["workers_total"] == 3
+        assert vm["workers_ok"] is True
+        assert vm["uptime_seconds"] == 3600.0
+
+    def test_present_heartbeat_unhealthy(self) -> None:
+        from datetime import UTC, datetime
+
+        from app.application.dto.live_dto import HeartbeatDTO
+        from app.dashboard.presenters import LiveDashboardPresenter
+
+        hb = HeartbeatDTO(
+            timestamp=datetime.now(UTC),
+            scheduler_running=False,
+            workers_healthy=1,
+            workers_total=3,
+            provider_healthy=False,
+        )
+        vm = LiveDashboardPresenter.present_heartbeat(hb)
+        assert vm["scheduler_status"] == "Stopped"
+        assert vm["scheduler_ok"] is False
+        assert vm["provider_status"] == "Unhealthy"
+        assert vm["provider_ok"] is False
+        assert vm["workers_ok"] is False
+
+    def test_present_metrics(self) -> None:
+        from app.application.dto.live_dto import LiveMetricsDTO
+        from app.dashboard.presenters import LiveDashboardPresenter
+
+        metrics = LiveMetricsDTO(
+            active_matches=5,
+            workers_active=2,
+            workers_total=3,
+            queue_size=10,
+            events_published=100,
+            avg_prediction_time_ms=45.2,
+            avg_signal_time_ms=12.8,
+            provider_latency_ms=30.5,
+            uptime_seconds=7200.0,
+        )
+        vm = LiveDashboardPresenter.present_metrics(metrics)
+        assert vm["active_matches"] == 5
+        assert vm["events_published"] == 100
+        assert vm["avg_prediction_time_ms"] == 45.2
+        assert vm["provider_latency_ms"] == 30.5
+        assert vm["uptime_seconds"] == 7200.0
+
+    def test_present_recent_events(self) -> None:
+        from datetime import UTC, datetime
+
+        from app.application.dto.live_dto import LiveEventDTO
+        from app.dashboard.presenters import LiveDashboardPresenter
+
+        events = [
+            LiveEventDTO(
+                event_id="evt_001",
+                event_type="prediction_updated",
+                fixture_id=100,
+                timestamp=datetime.now(UTC),
+                correlation_id="corr_1",
+            ),
+            LiveEventDTO(
+                event_id="evt_002",
+                event_type="signal_created",
+                fixture_id=200,
+                timestamp=datetime.now(UTC),
+            ),
+        ]
+        vm = LiveDashboardPresenter.present_recent_events(events)
+        assert vm["total"] == 2
+        assert vm["event_types"] == 2
+        assert len(vm["events"]) == 2
+        assert vm["events"][0]["event_type"] == "prediction_updated"
+        assert vm["events"][0]["correlation_id"] == "corr_1"
+
+    def test_present_provider_health(self) -> None:
+        from app.application.dto.provider_dto import ProviderDTO
+        from app.dashboard.presenters import LiveDashboardPresenter
+
+        providers = [
+            ProviderDTO(
+                name="mock",
+                status="healthy",
+                success_rate=0.95,
+                avg_response_ms=42.0,
+                total_requests=100,
+                consecutive_failures=0,
+            ),
+            ProviderDTO(
+                name="api_football",
+                status="degraded",
+                success_rate=0.70,
+                avg_response_ms=200.0,
+                total_requests=50,
+                consecutive_failures=3,
+            ),
+        ]
+        vm = LiveDashboardPresenter.present_provider_health(providers)
+        assert vm["healthy_count"] == 1
+        assert vm["total_count"] == 2
+        assert vm["all_healthy"] is False
+        assert len(vm["providers"]) == 2
+        assert vm["providers"][0]["name"] == "mock"
+        assert vm["providers"][0]["success_rate"] == 95.0
+
+    def test_present_queue_status(self) -> None:
+        from app.application.dto.live_dto import LiveStatusDTO
+        from app.dashboard.presenters import LiveDashboardPresenter
+
+        status = LiveStatusDTO(
+            running=True,
+            active_matches=3,
+            workers_active=2,
+            workers_total=3,
+            queue_size=5,
+            events_published=50,
+            uptime_seconds=1800.0,
+        )
+        vm = LiveDashboardPresenter.present_queue_status(status)
+        assert vm["queue_size"] == 5
+        assert vm["active_matches"] == 3
+        assert vm["workers_active"] == 2
+        assert vm["workers_total"] == 3
+        assert vm["events_published"] == 50
+        assert vm["uptime_seconds"] == 1800.0
+
+
+# ===== LivePage Tests =====
+
+
+class TestLivePage:
+    def test_live_page_defaults(self) -> None:
+        from app.dashboard.pages_live import LivePage
+
+        page = LivePage(title="Test")
+        assert page.title == "Test"
+        assert page.description == ""
+        assert page.widgets == []
+        assert page.tables == []
+
+    def test_live_page_serialization(self) -> None:
+        from app.dashboard.pages_live import LivePage
+        from app.dashboard.widgets import Widget
+
+        page = LivePage(
+            title="Live Matches",
+            description="Current matches",
+            widgets=[Widget(title="Active", value=5)],
+        )
+        data = page.model_dump()
+        assert data["title"] == "Live Matches"
+        assert len(data["widgets"]) == 1
+
+
+class TestLivePageFactory:
+    def test_live_matches_page(self) -> None:
+        from app.dashboard.pages_live import LivePageFactory
+
+        matches = [
+            {
+                "home_team": "A",
+                "away_team": "B",
+                "state": "live",
+                "competition_name": "PL",
+            },
+            {
+                "home_team": "C",
+                "away_team": "D",
+                "state": "scheduled",
+                "competition_name": "LL",
+            },
+        ]
+        page = LivePageFactory.live_matches_page(matches, active_count=2)
+        assert page.title == "Live Matches"
+        assert len(page.widgets) >= 1
+        assert len(page.tables) == 2
+
+    def test_workers_page(self) -> None:
+        from app.dashboard.pages_live import LivePageFactory
+
+        workers = [
+            {"worker_id": "w1", "status": "idle"},
+            {"worker_id": "w2", "status": "processing"},
+        ]
+        page = LivePageFactory.workers_page(workers)
+        assert page.title == "Workers"
+        assert len(page.widgets) >= 1
+        assert len(page.tables) == 2
+
+    def test_heartbeat_page(self) -> None:
+        from app.dashboard.pages_live import LivePageFactory
+
+        hb = {
+            "scheduler_running": True,
+            "provider_healthy": True,
+            "workers_healthy": 3,
+            "workers_total": 3,
+            "uptime_seconds": 3600.0,
+        }
+        page = LivePageFactory.heartbeat_page(hb)
+        assert page.title == "Heartbeat"
+        assert len(page.widgets) == 4
+
+    def test_live_metrics_page(self) -> None:
+        from app.dashboard.pages_live import LivePageFactory
+
+        metrics = {
+            "active_matches": 5,
+            "events_published": 100,
+            "avg_prediction_time_ms": 45.0,
+            "avg_signal_time_ms": 12.0,
+            "provider_latency_ms": 30.0,
+            "uptime_seconds": 7200.0,
+        }
+        page = LivePageFactory.live_metrics_page(metrics)
+        assert page.title == "Live Metrics"
+        assert len(page.widgets) == 6
+
+    def test_recent_events_page(self) -> None:
+        from app.dashboard.pages_live import LivePageFactory
+
+        events = [
+            {"event_id": "evt_1", "event_type": "prediction_updated", "fixture_id": 1},
+        ]
+        page = LivePageFactory.recent_events_page(events)
+        assert page.title == "Recent Events"
+        assert len(page.tables) == 1
+
+    def test_provider_health_page(self) -> None:
+        from app.dashboard.pages_live import LivePageFactory
+
+        providers = [
+            {
+                "name": "mock",
+                "status": "healthy",
+                "success_rate": 95.0,
+                "avg_response_ms": 42.0,
+                "total_requests": 100,
+                "consecutive_failures": 0,
+            },
+        ]
+        page = LivePageFactory.provider_health_page(providers)
+        assert page.title == "Provider Health"
+        assert len(page.tables) == 1
+
+    def test_queue_status_page(self) -> None:
+        from app.dashboard.pages_live import LivePageFactory
+
+        queue_stats = {"total": 10, "priority": 3, "normal": 7, "processed": 50}
+        page = LivePageFactory.queue_status_page(queue_stats)
+        assert page.title == "Queue Status"
+        assert len(page.widgets) == 4
+
+
 # ===== Backward Compatibility Test =====
 
 

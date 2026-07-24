@@ -6,7 +6,6 @@ Pipeline:
 
 from __future__ import annotations
 
-import time
 import uuid
 from collections.abc import Callable, Coroutine
 from typing import TYPE_CHECKING, Any
@@ -17,7 +16,9 @@ if TYPE_CHECKING:
 
 from app.live.events import EventFactory, LiveEvent
 from app.live.interfaces import WorkerInterface
+from app.live.logging_context import LogContext, Timer, log_with_context
 from app.live.models import LiveMatch, MatchState, WorkerStatus
+from app.live.recovery import WorkerRecovery
 from app.live.state import StateRegistry
 from app.logging import get_logger
 from app.prediction.models import PredictionRequest
@@ -47,12 +48,14 @@ class LiveWorker(WorkerInterface):
         state_registry: StateRegistry | None = None,
         prediction_engine: PredictionEngine | None = None,
         signal_engine: SignalEngine | None = None,
+        recovery: WorkerRecovery | None = None,
     ) -> None:
         self._worker_id = worker_id or f"worker_{uuid.uuid4().hex[:8]}"
         self._provider_manager = provider_manager
         self._state_registry = state_registry
         self._prediction_engine = prediction_engine
         self._signal_engine = signal_engine
+        self._recovery = recovery or WorkerRecovery()
         self._busy = False
         self._current_fixture: int | None = None
         self._processed_count = 0
@@ -105,49 +108,81 @@ class LiveWorker(WorkerInterface):
         self._busy = True
         self._current_fixture = match.fixture_id
         events: list[LiveEvent] = []
+        correlation_id = f"corr_{uuid.uuid4().hex[:8]}"
+
+        ctx = LogContext(
+            correlation_id=correlation_id,
+            worker_id=self._worker_id,
+            match_id=match.fixture_id,
+        )
 
         if self._state_registry:
             await self._state_registry.update_worker_status(
                 self._worker_id, WorkerStatus.PROCESSING, match.fixture_id
             )
 
-        start_time = time.perf_counter()
-        correlation_id = f"corr_{uuid.uuid4().hex[:8]}"
+        log_with_context(
+            logger,
+            "info",
+            f"Worker {self._worker_id} starting fixture {match.fixture_id}",
+        )
 
         try:
-            # Step 1: Update match state to PREPARING
-            if self._state_registry:
-                await self._state_registry.update_match_state(
-                    match.fixture_id, MatchState.PREPARING
+            with ctx:
+                with Timer() as timer:
+                    # Step 1: Update match state to PREPARING
+                    if self._state_registry:
+                        await self._state_registry.update_match_state(
+                            match.fixture_id, MatchState.PREPARING
+                        )
+
+                    # Step 2: Fetch latest data from Provider
+                    updated_match = await self._fetch_latest_data(match)
+
+                    # Step 3: Run AI Analysis + Prediction + Signal
+                    prediction_events = await self._run_pipeline(
+                        updated_match, correlation_id
+                    )
+                    events.extend(prediction_events)
+
+                    # Step 4: Update state based on provider status
+                    new_state = self._determine_state(updated_match)
+                    if self._state_registry:
+                        await self._state_registry.update_match_state(
+                            updated_match.fixture_id, new_state
+                        )
+
+                    self._processed_count += 1
+
+                log_with_context(
+                    logger,
+                    "info",
+                    f"Worker {self._worker_id} completed fixture {match.fixture_id} "
+                    f"in {timer.elapsed_ms:.1f}ms ({len(events)} events)",
+                    execution_time_ms=timer.elapsed_ms,
                 )
-
-            # Step 2: Fetch latest data from Provider
-            updated_match = await self._fetch_latest_data(match)
-
-            # Step 3: Run AI Analysis + Prediction + Signal
-            prediction_events = await self._run_pipeline(updated_match, correlation_id)
-            events.extend(prediction_events)
-
-            # Step 4: Update state based on provider status
-            new_state = self._determine_state(updated_match)
-            if self._state_registry:
-                await self._state_registry.update_match_state(
-                    updated_match.fixture_id, new_state
-                )
-
-            self._processed_count += 1
 
         except Exception as e:
             self._error_count += 1
-            logger.warning(
-                f"Worker {self._worker_id} failed processing fixture {match.fixture_id}: {e}"
+            log_with_context(
+                logger,
+                "warning",
+                f"Worker {self._worker_id} failed processing fixture {match.fixture_id}: {e}",
             )
             if self._state_registry:
                 await self._state_registry.update_worker_status(
                     self._worker_id, WorkerStatus.ERROR, match.fixture_id
                 )
+
+            # Attempt recovery
+            async def restart_fn() -> bool:
+                log_with_context(
+                    logger, "info", f"Restarting worker {self._worker_id} after failure"
+                )
+                return True
+
+            await self._recovery.recover(self._worker_id, restart_fn)
         finally:
-            elapsed = time.perf_counter() - start_time
             self._busy = False
             self._current_fixture = None
 
@@ -156,17 +191,12 @@ class LiveWorker(WorkerInterface):
                     self._worker_id, WorkerStatus.IDLE
                 )
 
-            logger.debug(
-                f"Worker {self._worker_id} processed fixture {match.fixture_id} "
-                f"in {elapsed:.2f}s ({len(events)} events)"
-            )
-
         # Notify callbacks
         for callback in self._callbacks:
             try:
                 await callback(match, events)
             except Exception as e:
-                logger.warning(f"Callback failed: {e}")
+                log_with_context(logger, "warning", f"Callback failed: {e}")
 
         return events
 
@@ -176,7 +206,16 @@ class LiveWorker(WorkerInterface):
             return match
 
         try:
-            fixture = await self._provider_manager.fixture(match.fixture_id)
+            with Timer() as timer:
+                fixture = await self._provider_manager.fixture(match.fixture_id)
+
+            log_with_context(
+                logger,
+                "debug",
+                f"Provider fetch for fixture {match.fixture_id} in {timer.elapsed_ms:.1f}ms",
+                provider_time_ms=timer.elapsed_ms,
+            )
+
             if fixture:
                 return LiveMatch(
                     fixture_id=fixture.id,
@@ -192,8 +231,10 @@ class LiveWorker(WorkerInterface):
                     away_score=fixture.away_score,
                 )
         except Exception as e:
-            logger.debug(
-                f"Failed to fetch latest data for fixture {match.fixture_id}: {e}"
+            log_with_context(
+                logger,
+                "debug",
+                f"Failed to fetch latest data for fixture {match.fixture_id}: {e}",
             )
 
         return match
@@ -209,18 +250,28 @@ class LiveWorker(WorkerInterface):
         signal_engine = self._signal_engine
 
         if prediction_engine is None or signal_engine is None:
-            logger.debug(f"Engines not available for fixture {match.fixture_id}")
+            log_with_context(
+                logger, "debug", f"Engines not available for fixture {match.fixture_id}"
+            )
             return events
 
         # Run Prediction
         try:
-            request = PredictionRequest(
-                fixture_id=match.fixture_id,
-                home_team_id=match.home_team_id,
-                away_team_id=match.away_team_id,
-                force_refresh=True,
+            with Timer() as pred_timer:
+                request = PredictionRequest(
+                    fixture_id=match.fixture_id,
+                    home_team_id=match.home_team_id,
+                    away_team_id=match.away_team_id,
+                    force_refresh=True,
+                )
+                prediction = await prediction_engine.predict(request)
+
+            log_with_context(
+                logger,
+                "debug",
+                f"Prediction completed for fixture {match.fixture_id} in {pred_timer.elapsed_ms:.1f}ms",
+                execution_time_ms=pred_timer.elapsed_ms,
             )
-            prediction = await prediction_engine.predict(request)
 
             events.append(
                 EventFactory.prediction_updated(
@@ -232,7 +283,17 @@ class LiveWorker(WorkerInterface):
 
             # Run Signal Engine
             try:
-                signals = await signal_engine.process(prediction)
+                with Timer() as sig_timer:
+                    signals = await signal_engine.process(prediction)
+
+                log_with_context(
+                    logger,
+                    "debug",
+                    f"Signal generation completed for fixture {match.fixture_id} "
+                    f"in {sig_timer.elapsed_ms:.1f}ms ({len(signals)} signals)",
+                    execution_time_ms=sig_timer.elapsed_ms,
+                )
+
                 for signal in signals:
                     events.append(
                         EventFactory.signal_created(
@@ -244,12 +305,18 @@ class LiveWorker(WorkerInterface):
                         )
                     )
             except Exception as e:
-                logger.debug(
-                    f"Signal generation failed for fixture {match.fixture_id}: {e}"
+                log_with_context(
+                    logger,
+                    "debug",
+                    f"Signal generation failed for fixture {match.fixture_id}: {e}",
                 )
 
         except Exception as e:
-            logger.debug(f"Prediction failed for fixture {match.fixture_id}: {e}")
+            log_with_context(
+                logger,
+                "debug",
+                f"Prediction failed for fixture {match.fixture_id}: {e}",
+            )
 
         return events
 
