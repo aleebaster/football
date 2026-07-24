@@ -2,26 +2,30 @@
 
 Each page aggregates widgets and charts into a coherent view.
 Pages do not contain business logic — they compose widgets from the Application Layer.
+
+Architecture decision: Pydantic BaseModel is used instead of dataclass to ensure
+automatic JSON serialization, field validation, and consistency with the
+project-wide convention where all serializable models use Pydantic.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 from typing import Any
+
+from pydantic import BaseModel, Field
 
 from app.dashboard.charts import ChartData
 from app.dashboard.widgets import Widget
 
 
-@dataclass
-class DashboardPage:
+class DashboardPage(BaseModel):
     """A dashboard page layout."""
 
     title: str
     description: str = ""
-    widgets: list[Widget] = field(default_factory=list)
-    charts: list[ChartData] = field(default_factory=list)
-    tables: list[dict[str, Any]] = field(default_factory=list)
+    widgets: list[Widget] = Field(default_factory=list)
+    charts: list[ChartData] = Field(default_factory=list)
+    tables: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class PageFactory:

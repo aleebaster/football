@@ -3,7 +3,10 @@
 from app.application.dto.prediction_dto import PredictionDTO, PredictionSummaryDTO
 from app.application.mapper import Mapper
 from app.core.container import get_container
+from app.logging import get_logger
 from app.prediction.models import PredictionRequest
+
+logger = get_logger(__name__)
 
 
 class PredictionService:
@@ -32,6 +35,11 @@ class PredictionService:
                 result, home_team=home_team, away_team=away_team
             )
         except Exception:
+            logger.warning(
+                "Failed to generate prediction for fixture %d",
+                fixture_id,
+                exc_info=True,
+            )
             return PredictionDTO(
                 fixture_id=fixture_id,
                 home_team=home_team,
@@ -61,6 +69,11 @@ class PredictionService:
                 fixture_id, result, home_team=home_team, away_team=away_team
             )
         except Exception:
+            logger.warning(
+                "Failed to generate prediction summary for fixture %d",
+                fixture_id,
+                exc_info=True,
+            )
             return PredictionSummaryDTO(
                 fixture_id=fixture_id,
                 home_team=home_team,

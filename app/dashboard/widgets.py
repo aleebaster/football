@@ -1,17 +1,23 @@
 """Dashboard Widgets — reusable widget components for the web interface.
 
 Widgets are small, composable UI components that display data from the Application Layer.
-They do not contain business logic — only presentation formatting.
+They use Pydantic BaseModel for serialization, validation, and consistency with the
+rest of the project's architecture.
+
+Architecture decision: Pydantic BaseModel is used instead of dataclass to ensure
+automatic JSON serialization, field validation, and compatibility with FastAPI response
+models. This aligns with the project-wide convention where all serializable models
+use Pydantic.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 from typing import Any
 
+from pydantic import BaseModel, Field
 
-@dataclass
-class Widget:
+
+class Widget(BaseModel):
     """Base widget structure."""
 
     title: str
@@ -19,7 +25,7 @@ class Widget:
     subtitle: str = ""
     icon: str = ""
     color: str = "blue"
-    metadata: dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class WidgetFactory:

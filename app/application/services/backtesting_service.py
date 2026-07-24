@@ -4,6 +4,9 @@ from app.application.dto.backtest_dto import BacktestDTO, BacktestSummaryDTO
 from app.application.mapper import Mapper
 from app.backtesting.models import BacktestRequest, BacktestScope
 from app.core.container import get_container
+from app.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class BacktestingService:
@@ -42,6 +45,7 @@ class BacktestingService:
             result = await engine.run(request)
             return Mapper.to_backtest_dto(result)
         except Exception as e:
+            logger.warning("Backtest execution failed: %s", e, exc_info=True)
             return BacktestDTO(error=str(e))
 
     async def get_backtest(self, backtest_id: str) -> BacktestDTO | None:
@@ -54,6 +58,9 @@ class BacktestingService:
                 return None
             return Mapper.to_backtest_dto(result)
         except Exception:
+            logger.warning(
+                "Failed to retrieve backtest '%s'", backtest_id, exc_info=True
+            )
             return None
 
     async def get_backtests(
@@ -67,4 +74,7 @@ class BacktestingService:
             results = await persistence.get_all()
             return [Mapper.to_backtest_summary_dto(r) for r in results[:limit]]
         except Exception:
+            logger.warning(
+                "Failed to retrieve backtests (limit=%d)", limit, exc_info=True
+            )
             return []

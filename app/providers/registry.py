@@ -35,6 +35,14 @@ class ProviderRegistry:
     def names(self) -> list[str]:
         return list(self._providers.keys())
 
+    def items(self) -> list[tuple[str, BaseProvider]]:
+        """Return (name, provider) pairs for iteration."""
+        return list(self._providers.items())
+
+    def values(self) -> list[BaseProvider]:
+        """Return all registered providers."""
+        return list(self._providers.values())
+
     def __contains__(self, name: str) -> bool:
         return name in self._providers
 

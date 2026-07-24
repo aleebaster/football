@@ -3,6 +3,9 @@
 from app.application.dto.health_dto import HealthDTO
 from app.application.mapper import Mapper
 from app.core.container import get_container
+from app.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class HealthService:
@@ -11,11 +14,11 @@ class HealthService:
     def get_health(self) -> HealthDTO:
         container = get_container()
 
-        # Gather provider health info
+        # Gather provider health info via public API
         provider_health: list[dict[str, object]] = []
         try:
             registry = container.provider_registry
-            for name, provider in registry._providers.items():
+            for name, provider in registry.items():
                 health = provider.health_info
                 provider_health.append(
                     {
@@ -27,7 +30,7 @@ class HealthService:
                     }
                 )
         except Exception:
-            pass
+            logger.warning("Failed to gather provider health info", exc_info=True)
 
         return Mapper.to_health_dto(
             providers=provider_health,

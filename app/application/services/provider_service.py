@@ -3,6 +3,9 @@
 from app.application.dto.provider_dto import ProviderDTO, ProviderListDTO
 from app.application.mapper import Mapper
 from app.core.container import get_container
+from app.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class ProviderService:
@@ -17,7 +20,7 @@ class ProviderService:
         degraded = 0
         unhealthy = 0
 
-        for name, provider in registry._providers.items():
+        for name, provider in registry.items():
             health = provider.health_info
             dto = Mapper.to_provider_dto(name, health)
             providers.append(dto)
@@ -28,6 +31,10 @@ class ProviderService:
                 degraded += 1
             else:
                 unhealthy += 1
+
+        logger.debug(
+            f"Provider status: {len(providers)} total, {healthy} healthy, {degraded} degraded, {unhealthy} unhealthy"
+        )
 
         return ProviderListDTO(
             providers=providers,

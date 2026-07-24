@@ -2,28 +2,30 @@
 
 Provides structured data for charts without requiring a specific JS library.
 Uses a ChartProvider abstraction for future flexibility.
+
+Architecture decision: Pydantic BaseModel is used instead of dataclass to ensure
+automatic JSON serialization, field validation, and consistency with the
+project-wide convention where all serializable models use Pydantic.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from pydantic import BaseModel, Field
 
 
-@dataclass
-class ChartDataset:
+class ChartDataset(BaseModel):
     """A single dataset for a chart."""
 
     label: str
-    data: list[float] = field(default_factory=list)
+    data: list[float] = Field(default_factory=list)
     color: str = "#3b82f6"
 
 
-@dataclass
-class ChartData:
+class ChartData(BaseModel):
     """Chart data structure compatible with most JS charting libraries."""
 
-    labels: list[str] = field(default_factory=list)
-    datasets: list[ChartDataset] = field(default_factory=list)
+    labels: list[str] = Field(default_factory=list)
+    datasets: list[ChartDataset] = Field(default_factory=list)
 
 
 class ChartProvider:

@@ -9,6 +9,9 @@ from app.application.dto.statistics_dto import (
 from app.application.mapper import Mapper
 from app.backtesting.models import EvaluationResult
 from app.core.container import get_container
+from app.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class StatisticsService:
@@ -34,6 +37,7 @@ class StatisticsService:
             metrics = await metrics_calc.calculate(all_evaluations)
             return Mapper.to_overall_statistics_dto(metrics)
         except Exception:
+            logger.warning("Failed to compute overall statistics", exc_info=True)
             return OverallStatisticsDTO()
 
     async def get_statistics_by_market(self) -> list[MarketStatisticsDTO]:
@@ -53,6 +57,7 @@ class StatisticsService:
             breakdowns = metrics_calc.calculate_market_breakdown(all_evaluations)
             return Mapper.to_market_statistics_dtos(list(breakdowns))
         except Exception:
+            logger.warning("Failed to compute market statistics", exc_info=True)
             return []
 
     async def get_statistics_by_league(
@@ -75,8 +80,16 @@ class StatisticsService:
             league_stats = stats.calculate_by_league(all_evaluations, league_map)
             return Mapper.to_league_statistics_dtos(league_stats)
         except Exception:
+            logger.warning("Failed to compute league statistics", exc_info=True)
             return []
 
     async def get_statistics_by_team(self) -> list[TeamStatisticsDTO]:
-        """Get statistics broken down by team."""
+        """Get statistics broken down by team.
+
+        TODO: Implement team-level statistics aggregation.
+        Requires mapping fixture home_team_id/away_team_id to team names
+        and computing per-team win rates, ROI, and total predictions.
+        Depends on backtesting evaluation results containing team identifiers.
+        """
+        logger.debug("get_statistics_by_team is a placeholder — not yet implemented")
         return []

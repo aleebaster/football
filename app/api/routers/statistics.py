@@ -1,4 +1,13 @@
-"""Statistics Router — statistics endpoints."""
+"""Statistics Router — statistics endpoints.
+
+Note on /statistics/roi, /statistics/yield, /statistics/winrate:
+These endpoints return the full OverallStatisticsDTO which contains all
+metrics (win_rate, roi, yield_pct, etc.) in a single aggregated response.
+They are kept as convenience aliases for frontend clients that expect
+dedicated endpoints, but they share the same underlying computation to
+avoid duplicating business logic. If you need only a specific metric,
+extract it from the response payload.
+"""
 
 from fastapi import APIRouter, Depends
 
@@ -26,7 +35,11 @@ async def get_statistics(
 async def get_statistics_roi(
     service: StatisticsService = Depends(get_statistics_service),
 ) -> OverallStatisticsDTO:
-    """Get ROI statistics."""
+    """Get ROI statistics.
+
+    Returns the full statistics payload including roi, win_rate, yield_pct, etc.
+    This is a convenience alias — ROI can also be read from the /statistics endpoint.
+    """
     return await service.get_overall_statistics()
 
 
@@ -34,7 +47,11 @@ async def get_statistics_roi(
 async def get_statistics_yield(
     service: StatisticsService = Depends(get_statistics_service),
 ) -> OverallStatisticsDTO:
-    """Get yield statistics."""
+    """Get yield statistics.
+
+    Returns the full statistics payload including yield_pct, roi, win_rate, etc.
+    This is a convenience alias — yield can also be read from the /statistics endpoint.
+    """
     return await service.get_overall_statistics()
 
 
@@ -42,7 +59,11 @@ async def get_statistics_yield(
 async def get_statistics_winrate(
     service: StatisticsService = Depends(get_statistics_service),
 ) -> OverallStatisticsDTO:
-    """Get win rate statistics."""
+    """Get win rate statistics.
+
+    Returns the full statistics payload including win_rate, roi, yield_pct, etc.
+    This is a convenience alias — win rate can also be read from the /statistics endpoint.
+    """
     return await service.get_overall_statistics()
 
 
@@ -66,5 +87,10 @@ async def get_statistics_by_league(
 async def get_statistics_by_team(
     service: StatisticsService = Depends(get_statistics_service),
 ) -> list[TeamStatisticsDTO]:
-    """Get statistics broken down by team."""
+    """Get statistics broken down by team.
+
+    Note: This endpoint is currently a placeholder that returns an empty list.
+    Team-level aggregation requires mapping fixture team IDs to names from
+    backtesting evaluation results, which is planned for a future iteration.
+    """
     return await service.get_statistics_by_team()

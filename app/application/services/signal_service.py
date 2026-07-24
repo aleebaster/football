@@ -3,6 +3,9 @@
 from app.application.dto.signal_dto import SignalDTO, SignalListDTO
 from app.application.mapper import Mapper
 from app.core.container import get_container
+from app.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class SignalService:
@@ -34,6 +37,12 @@ class SignalService:
                 page_signals, total=len(signals), page=page, page_size=page_size
             )
         except Exception:
+            logger.warning(
+                "Failed to retrieve signals (page=%d, page_size=%d)",
+                page,
+                page_size,
+                exc_info=True,
+            )
             return SignalListDTO(page=page, page_size=page_size)
 
     async def get_signal(self, signal_id: str) -> SignalDTO | None:
@@ -46,4 +55,5 @@ class SignalService:
                 return None
             return Mapper.to_signal_dto(record.signal)
         except Exception:
+            logger.warning("Failed to retrieve signal '%s'", signal_id, exc_info=True)
             return None
