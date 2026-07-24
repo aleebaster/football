@@ -27,12 +27,13 @@ class TestHealthAPI:
     async def test_health_has_engines(self, client: AsyncClient) -> None:
         response = await client.get("/health")
         data = response.json()
-        assert len(data["engines"]) == 4
+        assert len(data["engines"]) == 5
         engine_names = [e["name"] for e in data["engines"]]
         assert "AI Engine" in engine_names
         assert "Prediction Engine" in engine_names
         assert "Signal Engine" in engine_names
         assert "Backtest Engine" in engine_names
+        assert "Live Engine" in engine_names
 
 
 class TestRootAPI:

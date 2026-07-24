@@ -5,6 +5,7 @@ from fastapi import Request
 from app.application.services.backtesting_service import BacktestingService
 from app.application.services.configuration_service import ConfigurationService
 from app.application.services.health_service import HealthService
+from app.application.services.live_service import LiveService
 from app.application.services.match_service import MatchService
 from app.application.services.prediction_service import PredictionService
 from app.application.services.provider_service import ProviderService
@@ -50,6 +51,11 @@ def get_provider_service() -> ProviderService:
 def get_configuration_service() -> ConfigurationService:
     """Get configuration service instance."""
     return ConfigurationService()
+
+
+def get_live_service() -> LiveService:
+    """Get live service instance."""
+    return LiveService()
 
 
 def get_correlation_id(request: Request) -> str:

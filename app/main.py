@@ -50,11 +50,28 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     except Exception as e:
         logger.error(f"Failed to start provider platform: {e}")
 
+    # Initialize Live Engine
+    live_engine = None
+    try:
+        from app.core.container import get_container
+
+        container = get_container()
+        live_engine = container.live_engine
+        await live_engine.start()
+        logger.info("Live Engine started")
+    except Exception as e:
+        logger.error(f"Failed to start Live Engine: {e}")
+
     logger.info("Application started successfully")
 
     yield
 
     logger.info("Shutting down application...")
+
+    # Stop Live Engine
+    if live_engine is not None:
+        await live_engine.stop()
+        logger.info("Live Engine stopped")
 
     # Stop provider platform
     if provider_manager is not None:
@@ -101,6 +118,7 @@ def create_app() -> FastAPI:
         backtesting_router,
         configuration_router,
         health_router,
+        live_router,
         matches_router,
         predictions_router,
         providers_router,
@@ -116,6 +134,7 @@ def create_app() -> FastAPI:
     application.include_router(statistics_router, tags=["Statistics"])
     application.include_router(providers_router, tags=["Providers"])
     application.include_router(configuration_router, tags=["Configuration"])
+    application.include_router(live_router, tags=["Live"])
 
     return application
 

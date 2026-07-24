@@ -1,7 +1,7 @@
 """Composition Root — central DI container.
 
 All services are assembled here in a single place.
-Every engine (AI, Prediction, Signal, Backtesting) shares the same instances.
+Every engine (AI, Prediction, Signal, Backtesting, Live) shares the same instances.
 All properties return their concrete types for full MyPy benefit.
 """
 
@@ -27,6 +27,7 @@ if TYPE_CHECKING:
     from app.backtesting.persistence import BacktestPersistence
     from app.backtesting.reporting import BacktestReporter
     from app.backtesting.runner import BacktestRunner
+    from app.live.engine import LiveEngine
     from app.prediction.engine import PredictionEngine
     from app.signals.engine import SignalEngine
 
@@ -43,6 +44,7 @@ class Container:
         prediction = container.prediction_engine
         signal = container.signal_engine
         backtest = container.backtest_engine
+        live = container.live_engine
     """
 
     def __init__(self) -> None:
@@ -54,6 +56,7 @@ class Container:
         self._prediction_engine: PredictionEngine | None = None
         self._signal_engine: SignalEngine | None = None
         self._backtest_engine: BacktestEngine | None = None
+        self._live_engine: LiveEngine | None = None
 
     # ── Cache ────────────────────────────────────────────────────────
 
@@ -230,6 +233,21 @@ class Container:
             calibration=calibration,
         )
 
+    # ── Live Engine ──────────────────────────────────────────────────
+
+    @property
+    def live_engine(self) -> LiveEngine:
+        if self._live_engine is None:
+            from app.live.engine import LiveEngine
+
+            self._live_engine = LiveEngine(
+                provider_manager=self.provider_manager,
+                num_workers=3,
+                discovery_interval=60.0,
+                heartbeat_interval=30.0,
+            )
+        return self._live_engine
+
     # ── Cleanup ──────────────────────────────────────────────────────
 
     def reset(self) -> None:
@@ -242,6 +260,7 @@ class Container:
         self._prediction_engine = None
         self._signal_engine = None
         self._backtest_engine = None
+        self._live_engine = None
         logger.info("Container reset")
 
 

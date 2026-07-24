@@ -134,7 +134,7 @@ class TestMapper:
         dto = Mapper.to_health_dto(providers=[])
         assert dto.status == "healthy"
         assert len(dto.providers) == 0
-        assert len(dto.engines) == 4
+        assert len(dto.engines) == 5
 
     def test_to_health_dto_with_providers(self) -> None:
         providers = [
