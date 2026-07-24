@@ -396,13 +396,20 @@ class TestSignalFilter:
             user_id=1,
             min_confidence=0.6,
             allowed_markets=[PredictionMarket.MATCH_WINNER],
+            notification_start_hour=0,
+            notification_end_hour=23,
         )
         assert signal_filter.apply_user_preferences(signal, prefs) is True
 
     def test_apply_user_preferences_disabled(self) -> None:
         signal_filter = SignalFilter()
         signal = _make_signal()
-        prefs = UserPreferences(user_id=1, enabled=False)
+        prefs = UserPreferences(
+            user_id=1,
+            enabled=False,
+            notification_start_hour=0,
+            notification_end_hour=23,
+        )
         assert signal_filter.apply_user_preferences(signal, prefs) is False
 
 
@@ -929,6 +936,8 @@ class TestSignalEngine:
             user_id=1,
             min_confidence=0.5,
             allowed_markets=[PredictionMarket.MATCH_WINNER],
+            notification_start_hour=0,
+            notification_end_hour=23,
         )
         signals = await engine.process(prediction, prefs)
         assert len(signals) > 0
@@ -937,6 +946,15 @@ class TestSignalEngine:
     async def test_process_request(self) -> None:
         engine = SignalEngine(_make_cache())
         prediction = _make_prediction_result()
+        # Set preferences with wide notification hours to avoid time-dependent CI failures
+        engine.preferences.set(
+            UserPreferences(
+                user_id=1,
+                min_confidence=0.5,
+                notification_start_hour=0,
+                notification_end_hour=23,
+            )
+        )
         signals = await engine.process_request(prediction, user_id=1)
         assert len(signals) > 0
 
